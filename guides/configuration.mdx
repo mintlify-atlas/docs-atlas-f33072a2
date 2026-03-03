@@ -357,27 +357,17 @@ Coffee Finder uses environment variables for configuration. Create a `.env` file
 ```env .env
 # Required
 DATABASE_URL="file:./db/custom.db"
-
-# Application
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
-NODE_ENV="development"
-
-# Optional: External APIs
-OVERPASS_API_URL="https://overpass-api.de/api/interpreter"
 ```
 
 ### Environment variable reference
 
 | Variable | Required | Description | Default |
 |----------|----------|-------------|----------|
-| `DATABASE_URL` | Yes | Database connection string | - |
-| `NEXT_PUBLIC_APP_URL` | No | Public application URL | `http://localhost:3000` |
-| `NODE_ENV` | No | Environment mode | `development` |
-| `OVERPASS_API_URL` | No | OpenStreetMap API endpoint | `https://overpass-api.de/api/interpreter` |
+| `DATABASE_URL` | Yes | Prisma database connection string | `file:./db/custom.db` |
 
-<Warning>
-  Variables prefixed with `NEXT_PUBLIC_` are exposed to the browser. Never store secrets in these variables.
-</Warning>
+<Note>
+  Coffee Finder uses SQLite by default. For production deployments, you can switch to PostgreSQL or MySQL by updating the `DATABASE_URL` and the `provider` in `prisma/schema.prisma`.
+</Note>
 
 ### Environment-specific files
 
@@ -450,7 +440,7 @@ export async function GET(request: NextRequest) {
 
   // Query Overpass API for coffee shops
   const response = await fetch(
-    process.env.OVERPASS_API_URL || 'https://overpass-api.de/api/interpreter',
+    'https://overpass-api.de/api/interpreter',
     {
       method: 'POST',
       body: overpassQuery,

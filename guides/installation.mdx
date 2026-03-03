@@ -185,23 +185,17 @@ Coffee Finder requires minimal environment configuration. Create a `.env` file w
 ```env .env
 # Database
 DATABASE_URL="file:./db/custom.db"
-
-# Application
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
-NODE_ENV="development"
-
-# Optional: Overpass API (uses public endpoint by default)
-# OVERPASS_API_URL="https://overpass-api.de/api/interpreter"
 ```
 
 <Accordion title="Environment variable reference">
   | Variable | Required | Description | Default |
   |----------|----------|-------------|----------|
-  | `DATABASE_URL` | Yes | Database connection string | `file:./db/custom.db` |
-  | `NEXT_PUBLIC_APP_URL` | No | Application base URL | `http://localhost:3000` |
-  | `NODE_ENV` | No | Environment mode | `development` |
-  | `OVERPASS_API_URL` | No | OpenStreetMap Overpass API endpoint | `https://overpass-api.de/api/interpreter` |
+  | `DATABASE_URL` | Yes | Prisma database connection string | `file:./db/custom.db` |
 </Accordion>
+
+<Note>
+Coffee Finder uses the public Overpass API endpoint (`https://overpass-api.de/api/interpreter`) directly in the code. No API key is required.
+</Note>
 
 ## Verify installation
 
