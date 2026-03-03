@@ -1,0 +1,613 @@
+---
+title: Customization
+description: Customize Coffee Finder's appearance with theming, styling, colors, and component modifications
+---
+
+This guide shows you how to customize Coffee Finder's visual appearance, including colors, fonts, component styling, and map markers.
+
+## Theme customization
+
+Coffee Finder uses CSS variables for theming, making it easy to customize colors without modifying component code.
+
+### Color system
+
+All colors are defined in `src/app/globals.css` using CSS custom properties:
+
+```css globals.css
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  /* ... more dark mode colors */
+}
+```
+
+<Info>
+  Coffee Finder uses OKLCH color space for perceptually uniform colors across light and dark modes.
+</Info>
+
+### Change primary color
+
+To change the primary color throughout the application:
+
+<Steps>
+  <Step title="Choose your color">
+    Select a color and convert it to OKLCH format using a tool like [oklch.com](https://oklch.com).
+
+    Example: Blue `#3b82f6` converts to `oklch(0.617 0.176 252.65)`
+  </Step>
+
+  <Step title="Update CSS variables">
+    Edit `src/app/globals.css`:
+
+    ```css globals.css
+    :root {
+      --primary: oklch(0.617 0.176 252.65);
+      --primary-foreground: oklch(0.985 0 0);
+    }
+
+    .dark {
+      --primary: oklch(0.7 0.19 252.65);
+      --primary-foreground: oklch(0.145 0 0);
+    }
+    ```
+
+    <Tip>
+      Adjust lightness (first value) for dark mode to maintain proper contrast.
+    </Tip>
+  </Step>
+
+  <Step title="Verify changes">
+    Restart the development server:
+
+    ```bash
+    bun run dev
+    ```
+
+    The new primary color appears on buttons, links, and interactive elements.
+  </Step>
+</Steps>
+
+### Complete color schemes
+
+Create custom color schemes by modifying all color variables:
+
+<CodeGroup>
+  ```css Purple theme
+  :root {
+    --primary: oklch(0.55 0.24 292);
+    --primary-foreground: oklch(1 0 0);
+    --secondary: oklch(0.92 0.02 292);
+    --secondary-foreground: oklch(0.2 0 0);
+    --accent: oklch(0.85 0.08 292);
+    --accent-foreground: oklch(0.2 0 0);
+  }
+  ```
+
+  ```css Green theme
+  :root {
+    --primary: oklch(0.58 0.18 145);
+    --primary-foreground: oklch(1 0 0);
+    --secondary: oklch(0.92 0.03 145);
+    --secondary-foreground: oklch(0.2 0 0);
+    --accent: oklch(0.85 0.07 145);
+    --accent-foreground: oklch(0.2 0 0);
+  }
+  ```
+
+  ```css Orange theme
+  :root {
+    --primary: oklch(0.65 0.21 45);
+    --primary-foreground: oklch(0.1 0 0);
+    --secondary: oklch(0.93 0.04 45);
+    --secondary-foreground: oklch(0.2 0 0);
+    --accent: oklch(0.87 0.09 45);
+    --accent-foreground: oklch(0.2 0 0);
+  }
+  ```
+</CodeGroup>
+
+## Border radius
+
+Customize the roundness of components by adjusting the `--radius` variable:
+
+```css globals.css
+:root {
+  --radius: 0.625rem; /* Default: 10px */
+}
+
+/* Sharp corners */
+:root {
+  --radius: 0;
+}
+
+/* Extra rounded */
+:root {
+  --radius: 1rem; /* 16px */
+}
+
+/* Pill-shaped */
+:root {
+  --radius: 9999px;
+}
+```
+
+The radius automatically scales:
+- `--radius-lg`: Full radius
+- `--radius-md`: Radius - 2px
+- `--radius-sm`: Radius - 4px
+
+## Typography
+
+Coffee Finder uses Geist Sans and Geist Mono fonts, configured in `src/app/layout.tsx`:
+
+```typescript src/app/layout.tsx
+import { Geist, Geist_Mono } from "next/font/google";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+```
+
+### Change fonts
+
+Replace with different Google Fonts:
+
+<Steps>
+  <Step title="Import new fonts">
+    ```typescript src/app/layout.tsx
+    import { Inter, JetBrains_Mono } from "next/font/google";
+
+    const inter = Inter({
+      variable: "--font-sans",
+      subsets: ["latin"],
+    });
+
+    const jetbrainsMono = JetBrains_Mono({
+      variable: "--font-mono",
+      subsets: ["latin"],
+    });
+    ```
+  </Step>
+
+  <Step title="Update layout">
+    ```typescript src/app/layout.tsx
+    <body
+      className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
+    >
+      {children}
+    </body>
+    ```
+  </Step>
+
+  <Step title="Update Tailwind config">
+    ```typescript tailwind.config.ts
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['var(--font-sans)'],
+          mono: ['var(--font-mono)'],
+        },
+      },
+    },
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  Browse available fonts at [fonts.google.com](https://fonts.google.com).
+</Tip>
+
+## Map customization
+
+Customize the Leaflet map markers and styles.
+
+### User location marker
+
+The user's location is marked with a custom pin styled in `src/app/globals.css`:
+
+```css globals.css
+.coffee-finder-user-pin,
+.coffee-finder-user-pin div {
+  background: transparent;
+  border: none;
+}
+
+.coffee-finder-user-pin div {
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background-color: var(--primary);
+  border: 3px solid var(--background);
+}
+```
+
+### Coffee shop markers
+
+```css globals.css
+.coffee-finder-shop-pin div {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background-color: var(--chart-1);
+  border: 1px solid var(--foreground);
+}
+```
+
+### Customize marker appearance
+
+<CodeGroup>
+  ```css Larger markers
+  .coffee-finder-user-pin div {
+    width: 32px;
+    height: 32px;
+    border: 4px solid var(--background);
+  }
+
+  .coffee-finder-shop-pin div {
+    width: 28px;
+    height: 28px;
+  }
+  ```
+
+  ```css Square markers
+  .coffee-finder-user-pin div {
+    border-radius: 4px;
+  }
+
+  .coffee-finder-shop-pin div {
+    border-radius: 2px;
+  }
+  ```
+
+  ```css Diamond markers
+  .coffee-finder-user-pin div {
+    transform: rotate(45deg);
+    border-radius: 2px;
+  }
+  ```
+
+  ```css Custom colors
+  .coffee-finder-user-pin div {
+    background-color: oklch(0.617 0.176 252.65); /* Blue */
+  }
+
+  .coffee-finder-shop-pin div {
+    background-color: oklch(0.577 0.245 27.325); /* Red */
+  }
+  ```
+</CodeGroup>
+
+### Map tile layers
+
+To change the map style, edit the tile layer URL in your map component:
+
+```typescript
+// Default OpenStreetMap
+<TileLayer
+  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+  attribution='&copy; OpenStreetMap contributors'
+/>
+
+// Dark mode
+<TileLayer
+  url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+  attribution='&copy; OpenStreetMap &copy; CartoDB'
+/>
+
+// Light gray
+<TileLayer
+  url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+  attribution='&copy; OpenStreetMap &copy; CartoDB'
+/>
+
+// Satellite
+<TileLayer
+  url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+  attribution='&copy; Esri'
+/>
+```
+
+<Note>
+  Some tile providers require API keys. Check provider documentation for details.
+</Note>
+
+## Component customization
+
+Coffee Finder uses shadcn/ui components that can be customized.
+
+### Modify existing components
+
+Components are located in `src/components/ui/`. Edit them directly:
+
+```typescript src/components/ui/button.tsx
+const buttonVariants = cva(
+  "inline-flex items-center justify-center rounded-md text-sm font-medium",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        destructive: "bg-destructive text-destructive-foreground",
+        outline: "border border-input bg-background hover:bg-accent",
+        // Add custom variant
+        coffee: "bg-amber-600 text-white hover:bg-amber-700",
+      },
+      size: {
+        default: "h-10 px-4 py-2",
+        sm: "h-9 rounded-md px-3",
+        lg: "h-11 rounded-md px-8",
+        // Add custom size
+        xl: "h-14 rounded-md px-12 text-lg",
+      },
+    },
+  }
+)
+```
+
+Use the custom variant:
+
+```typescript
+<Button variant="coffee" size="xl">Find Coffee</Button>
+```
+
+### Add new components
+
+Install additional shadcn/ui components:
+
+```bash
+bun x shadcn@latest add command
+bun x shadcn@latest add calendar
+bun x shadcn@latest add form
+```
+
+Browse all components at [ui.shadcn.com](https://ui.shadcn.com).
+
+## Metadata and branding
+
+Customize application metadata in `src/app/layout.tsx`:
+
+```typescript src/app/layout.tsx
+export const metadata: Metadata = {
+  title: "Coffee Finder - Discover Nearby Coffee Shops",
+  description: "Find the best coffee shops near your location with our interactive map.",
+  keywords: ["coffee", "cafe", "coffee shops", "nearby", "map"],
+  authors: [{ name: "Your Name" }],
+  icons: {
+    icon: "/favicon.ico", // Add your favicon
+  },
+  openGraph: {
+    title: "Coffee Finder",
+    description: "Find the best coffee shops near your location",
+    url: "https://your-domain.com",
+    siteName: "Coffee Finder",
+    images: [
+      {
+        url: "https://your-domain.com/og-image.png",
+        width: 1200,
+        height: 630,
+      },
+    ],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Coffee Finder",
+    description: "Find the best coffee shops near your location",
+    images: ["https://your-domain.com/twitter-image.png"],
+  },
+};
+```
+
+<Steps>
+  <Step title="Replace favicon">
+    Add your favicon to `public/`:
+
+    ```bash
+    public/
+    ├── favicon.ico
+    ├── apple-touch-icon.png
+    └── android-chrome-192x192.png
+    ```
+  </Step>
+
+  <Step title="Update Open Graph images">
+    Create social sharing images:
+
+    - **OG Image**: 1200x630px
+    - **Twitter Card**: 1200x600px
+
+    Place them in `public/` and update metadata URLs.
+  </Step>
+
+  <Step title="Customize title and description">
+    Update the `title` and `description` fields to match your brand.
+  </Step>
+</Steps>
+
+## Dark mode customization
+
+Coffee Finder includes dark mode support via the `.dark` class.
+
+### Toggle dark mode
+
+Implement a theme switcher using `next-themes`:
+
+```typescript components/theme-toggle.tsx
+import { Moon, Sun } from "lucide-react"
+import { useTheme } from "next-themes"
+import { Button } from "@/components/ui/button"
+
+export function ThemeToggle() {
+  const { theme, setTheme } = useTheme()
+
+  return (
+    <Button
+      variant="outline"
+      size="icon"
+      onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+    >
+      <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+      <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+      <span className="sr-only">Toggle theme</span>
+    </Button>
+  )
+}
+```
+
+### Customize dark mode colors
+
+Adjust dark mode colors independently:
+
+```css globals.css
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  
+  /* Custom dark primary color */
+  --primary: oklch(0.75 0.19 252.65);
+  --primary-foreground: oklch(0.145 0 0);
+  
+  /* Softer borders in dark mode */
+  --border: oklch(1 0 0 / 15%);
+  --input: oklch(1 0 0 / 20%);
+}
+```
+
+## Responsive design
+
+Tailwind CSS provides responsive utilities for different screen sizes:
+
+```typescript
+<div className="
+  text-sm       /* Mobile: small text */
+  md:text-base  /* Tablet: base text */
+  lg:text-lg    /* Desktop: large text */
+  p-4           /* Mobile: 1rem padding */
+  md:p-6        /* Tablet: 1.5rem padding */
+  lg:p-8        /* Desktop: 2rem padding */
+">
+  Coffee Finder
+</div>
+```
+
+Breakpoints:
+- `sm`: 640px
+- `md`: 768px
+- `lg`: 1024px
+- `xl`: 1280px
+- `2xl`: 1536px
+
+## Custom CSS
+
+Add custom global styles to `src/app/globals.css`:
+
+```css globals.css
+@layer base {
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--muted);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: var(--radius);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--ring);
+  }
+}
+
+@layer utilities {
+  /* Custom utility classes */
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .coffee-gradient {
+    background: linear-gradient(
+      135deg,
+      oklch(0.58 0.18 45),
+      oklch(0.45 0.15 30)
+    );
+  }
+}
+```
+
+## Animation customization
+
+Coffee Finder uses `tailwindcss-animate` for animations. Customize in `tailwind.config.ts`:
+
+```typescript tailwind.config.ts
+theme: {
+  extend: {
+    animation: {
+      'fade-in': 'fadeIn 0.3s ease-in',
+      'slide-up': 'slideUp 0.4s ease-out',
+    },
+    keyframes: {
+      fadeIn: {
+        '0%': { opacity: '0' },
+        '100%': { opacity: '1' },
+      },
+      slideUp: {
+        '0%': { transform: 'translateY(10px)', opacity: '0' },
+        '100%': { transform: 'translateY(0)', opacity: '1' },
+      },
+    },
+  },
+},
+```
+
+Use custom animations:
+
+```typescript
+<div className="animate-fade-in">
+  Content fades in
+</div>
+
+<div className="animate-slide-up">
+  Content slides up
+</div>
+```
+
+## Next steps
+
+With your customized Coffee Finder:
+
+- [Deploy to production](/guides/deployment) - Share your customized app
+- [API reference](/api/coffee-shops) - Integrate custom features

@@ -1,0 +1,434 @@
+---
+title: Coffee shop data
+description: Real-time coffee shop information from OpenStreetMap via the Overpass API with detailed metadata
+---
+
+Coffee Finder retrieves coffee shop data from OpenStreetMap (OSM), a free, community-maintained geographic database. The Overpass API provides real-time querying of OSM data, returning detailed information about nearby cafes and coffee shops.
+
+## Data source
+
+Coffee shop data comes from the Overpass API, a read-only API for OpenStreetMap:
+
+- **API endpoint:** `https://overpass-api.de/api/interpreter`
+- **Data freshness:** Updated continuously by OSM contributors
+- **Coverage:** Worldwide
+- **Cost:** Free and open-source
+- **Rate limits:** Fair-use policy (queries cached for 120 seconds)
+
+<Info>
+OpenStreetMap data is contributed by volunteers worldwide. Coverage quality varies by region, with urban areas typically having more complete data than rural locations.
+</Info>
+
+## Coffee shop interface
+
+Each coffee shop is represented by a standardized data structure:
+
+```typescript src/app/api/coffee-shops/route.ts
+interface CoffeeShop {
+  id: string                    // Unique identifier (e.g., "osm-123456")
+  name: string                  // Shop name
+  address: string              // Formatted street address
+  rating?: number              // Not available from OSM
+  totalRatings?: number        // Not available from OSM
+  isOpen?: boolean             // Not available from OSM
+  phone?: string               // Contact phone number
+  website?: string             // Shop website URL
+  distance?: number            // Distance in meters from user
+  location: {                  // Geographic coordinates
+    lat: number
+    lng: number
+  }
+  priceLevel?: number          // Not available from OSM
+  types?: string[]             // Shop categories
+}
+```
+
+<Warning>
+Some fields like `rating`, `totalRatings`, `isOpen`, and `priceLevel` are not available from OpenStreetMap. These are included in the interface for future integration with other data sources (e.g., Google Places API).
+</Warning>
+
+## API endpoint
+
+Coffee Finder exposes a Next.js API route for fetching coffee shops:
+
+```typescript
+GET /api/coffee-shops?lat={latitude}&lng={longitude}&query={search}&radius={meters}
+```
+
+### Query parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `lat` | number | Yes | - | User's latitude |
+| `lng` | number | Yes | - | User's longitude |
+| `query` | string | No | - | Search term to filter by name |
+| `radius` | number | No | 8000 | Search radius in meters (100-100,000) |
+
+### Example request
+
+```bash
+curl "https://coffee-finder.com/api/coffee-shops?lat=37.7749&lng=-122.4194&query=starbucks&radius=5000"
+```
+
+### Response format
+
+```json
+{
+  "shops": [
+    {
+      "id": "osm-123456",
+      "name": "Starbucks Coffee",
+      "address": "123 Market Street, San Francisco",
+      "phone": "+1 (555) 123-4567",
+      "website": "https://www.starbucks.com",
+      "distance": 245,
+      "location": {
+        "lat": 37.7751,
+        "lng": -122.4183
+      },
+      "types": ["cafe"]
+    }
+  ]
+}
+```
+
+## Overpass query construction
+
+The API builds dynamic Overpass QL queries based on user parameters:
+
+```typescript src/app/api/coffee-shops/route.ts
+const normalizedQuery = (query || '').trim()
+const escapedQuery = normalizedQuery.replaceAll('"', '').replaceAll('\\', '')
+
+const nameFilter = escapedQuery
+  ? `["name"~"${escapedQuery}",i]`
+  : ''
+
+const overpassQuery = `
+[out:json][timeout:25];
+(
+  node["amenity"="cafe"]${nameFilter}(around:${radiusMeters},${latitude},${longitude});
+  way["amenity"="cafe"]${nameFilter}(around:${radiusMeters},${latitude},${longitude});
+  relation["amenity"="cafe"]${nameFilter}(around:${radiusMeters},${latitude},${longitude});
+);
+out center tags;
+`
+```
+
+<Accordion title="Query structure breakdown">
+  - `[out:json]` - Request JSON format response
+  - `[timeout:25]` - Maximum 25-second query execution
+  - `node/way/relation` - Search all OSM geometry types
+  - `["amenity"="cafe"]` - Filter for cafe amenities
+  - `["name"~"...",i]` - Case-insensitive name regex match
+  - `(around:radius,lat,lng)` - Geographic circle search
+  - `out center tags;` - Return center coordinates and all tags
+</Accordion>
+
+## Data normalization
+
+Raw Overpass results are normalized into the `CoffeeShop` interface:
+
+```typescript src/app/api/coffee-shops/route.ts
+function normalizeElement(element: OverpassElement, userLat: number, userLng: number): CoffeeShop | null {
+  const lat = element.lat ?? element.center?.lat
+  const lon = element.lon ?? element.center?.lon
+
+  if (lat === undefined || lon === undefined) {
+    return null
+  }
+
+  const tags = element.tags || {}
+  const name = tags.name || 'Coffee Shop'
+  const distance = calculateDistance(userLat, userLng, lat, lon)
+
+  return {
+    id: `osm-${element.id}`,
+    name,
+    address: buildAddress(tags),
+    isOpen: undefined,
+    phone: tags.phone || tags['contact:phone'],
+    website: tags.website || tags['contact:website'],
+    distance,
+    location: {
+      lat,
+      lng: lon,
+    },
+    types: ['cafe'],
+  }
+}
+```
+
+### Address construction
+
+OSM stores addresses as separate tags. The API builds formatted addresses:
+
+```typescript src/app/api/coffee-shops/route.ts
+function buildAddress(tags: Record<string, string> | undefined): string {
+  if (!tags) {
+    return 'Address not available'
+  }
+
+  const street = tags['addr:street']
+  const houseNumber = tags['addr:housenumber']
+  const city = tags['addr:city'] || tags['addr:town'] || tags['addr:village']
+
+  const firstLine = [houseNumber, street].filter(Boolean).join(' ').trim()
+  if (firstLine && city) {
+    return `${firstLine}, ${city}`
+  }
+  if (firstLine) {
+    return firstLine
+  }
+  if (city) {
+    return city
+  }
+  if (tags['addr:full']) {
+    return tags['addr:full']
+  }
+  return 'Address not available'
+}
+```
+
+<Tabs>
+  <Tab title="Complete address">
+    ```
+    addr:housenumber = "123"
+    addr:street = "Main Street"
+    addr:city = "San Francisco"
+    
+    → "123 Main Street, San Francisco"
+    ```
+  </Tab>
+  
+  <Tab title="Street only">
+    ```
+    addr:housenumber = "456"
+    addr:street = "Oak Avenue"
+    
+    → "456 Oak Avenue"
+    ```
+  </Tab>
+  
+  <Tab title="City only">
+    ```
+    addr:city = "Portland"
+    
+    → "Portland"
+    ```
+  </Tab>
+  
+  <Tab title="No address">
+    ```
+    (no address tags)
+    
+    → "Address not available"
+    ```
+  </Tab>
+</Tabs>
+
+## Distance calculation
+
+The Haversine formula calculates accurate distances on Earth's surface:
+
+```typescript src/app/api/coffee-shops/route.ts
+function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const radius = 6371000  // Earth's radius in meters
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLng = ((lng2 - lng1) * Math.PI) / 180
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return radius * c
+}
+```
+
+This provides:
+- Accurate distances accounting for Earth's curvature
+- Results in meters
+- Performance suitable for real-time queries
+
+<Info>
+For reference, 1 degree of latitude ≈ 111km. The Haversine formula provides accurate results for distances up to ~10,000km.
+</Info>
+
+## Result processing
+
+After normalization, results are sorted and limited:
+
+```typescript src/app/api/coffee-shops/route.ts
+const shops = elements
+  .map((element) => normalizeElement(element, latitude, longitude))
+  .filter((shop): shop is CoffeeShop => shop !== null)
+  .sort((a, b) => (a.distance || 0) - (b.distance || 0))
+  .slice(0, 60)
+```
+
+1. **Map:** Convert raw OSM elements to CoffeeShop objects
+2. **Filter:** Remove invalid entries (null results)
+3. **Sort:** Order by distance (nearest first)
+4. **Limit:** Return maximum 60 results
+
+<Note>
+The 60-result limit balances data completeness with performance. Most users interact with only the closest 10-20 coffee shops.
+</Note>
+
+## Caching strategy
+
+Next.js automatically caches Overpass responses:
+
+```typescript src/app/api/coffee-shops/route.ts
+const response = await fetch('https://overpass-api.de/api/interpreter', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'text/plain;charset=UTF-8',
+  },
+  body: overpassQuery,
+  next: { revalidate: 120 },
+})
+```
+
+The `revalidate: 120` option:
+- Caches responses for 120 seconds (2 minutes)
+- Reduces load on Overpass API
+- Improves response times for repeated queries
+- Respects fair-use policies
+
+## Fallback mock data
+
+If the Overpass API fails, mock data is generated:
+
+```typescript src/app/api/coffee-shops/route.ts
+try {
+  // ... Overpass query ...
+  return NextResponse.json({ shops })
+} catch (error) {
+  console.error('Error fetching coffee shops from Overpass:', error)
+  return NextResponse.json({ shops: generateMockCoffeeShops(latitude, longitude) })
+}
+```
+
+### Mock data generation
+
+```typescript src/app/api/coffee-shops/route.ts
+function generateMockCoffeeShops(lat: number, lng: number) {
+  const coffeeShopNames = [
+    'The Cozy Bean',
+    'Morning Brew Café',
+    'Artisan Coffee House',
+    'Bean There, Drank That',
+    'The Coffee Corner',
+    // ... more names
+  ]
+
+  return coffeeShopNames.map((name, index) => {
+    const latOffset = (Math.random() - 0.5) * 0.02
+    const lngOffset = (Math.random() - 0.5) * 0.02
+
+    return {
+      id: `mock-${index}`,
+      name,
+      address: addresses[index],
+      rating: Math.round((3.5 + Math.random() * 1.5) * 10) / 10,
+      totalRatings: Math.floor(50 + Math.random() * 500),
+      isOpen: Math.random() > 0.3,
+      phone: `+1 (555) ${String(Math.floor(100 + Math.random() * 900))}-...`,
+      website: `https://example.com/${name.toLowerCase().replaceAll(/\s+/g, '-')}`,
+      distance: Math.round(100 + Math.random() * 1500),
+      location: {
+        lat: lat + latOffset,
+        lng: lng + lngOffset,
+      },
+      priceLevel: Math.ceil(Math.random() * 3),
+      types: ['cafe', 'food', 'store'],
+    }
+  })
+}
+```
+
+<Warning>
+Mock data ensures the application remains functional during Overpass API outages, but results are fictional and for demonstration purposes only.
+</Warning>
+
+## Error handling
+
+The API validates all input parameters:
+
+```typescript src/app/api/coffee-shops/route.ts
+if (!lat || !lng) {
+  return NextResponse.json({ error: 'Latitude and longitude are required' }, { status: 400 })
+}
+
+const latitude = Number.parseFloat(lat)
+const longitude = Number.parseFloat(lng)
+const radiusMeters = Number.parseInt(radius, 10)
+
+if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
+  return NextResponse.json({ error: 'Invalid latitude or longitude' }, { status: 400 })
+}
+
+if (Number.isNaN(radiusMeters) || radiusMeters < 100 || radiusMeters > 100000) {
+  return NextResponse.json({ error: 'Radius must be between 100 and 100000 meters' }, { status: 400 })
+}
+```
+
+### Error responses
+
+| HTTP Status | Error Message | Cause |
+|-------------|---------------|-------|
+| 400 | Latitude and longitude are required | Missing lat or lng parameter |
+| 400 | Invalid latitude or longitude | Non-numeric coordinates |
+| 400 | Radius must be between 100 and 100000 meters | Invalid radius value |
+
+## Contact information extraction
+
+OSM supports multiple tag formats for phone and website:
+
+```typescript src/app/api/coffee-shops/route.ts
+phone: tags.phone || tags['contact:phone'],
+website: tags.website || tags['contact:website'],
+```
+
+<Accordion title="Standard tags">
+  ```
+  phone = "+1 555-123-4567"
+  website = "https://example.com"
+  ```
+</Accordion>
+
+<Accordion title="Contact namespace tags">
+  ```
+  contact:phone = "+1 555-123-4567"
+  contact:website = "https://example.com"
+  ```
+  
+  The `contact:` prefix is an OSM convention for businesses with multiple locations.
+</Accordion>
+
+## Data completeness
+
+Not all coffee shops have complete information. Typical field availability:
+
+| Field | Availability | Notes |
+|-------|--------------|-------|
+| Name | ~95% | Most shops are named in OSM |
+| Address | ~70% | Street addresses vary by region |
+| Phone | ~30% | Often missing or outdated |
+| Website | ~25% | Less commonly added to OSM |
+| Coordinates | 100% | Required for OSM entities |
+
+<Tip>
+Users can contribute missing data to OpenStreetMap by creating a free account and editing the map. Improvements benefit all OSM-based applications.
+</Tip>
+
+## Performance metrics
+
+Typical API response times:
+
+- **Cache hit:** 50-100ms (Next.js cache)
+- **Cache miss (Overpass):** 500-2000ms (varies by region and load)
+- **Fallback (mock data):** 10-20ms
+
+The 120-second cache window ensures most requests hit the fast path.

@@ -1,0 +1,509 @@
+---
+title: Configuration
+description: Configure Coffee Finder with environment variables, framework settings, and customization options
+---
+
+This guide covers all configuration options for Coffee Finder, including Next.js settings, database configuration, Tailwind CSS customization, and environment variables.
+
+## Next.js configuration
+
+The Next.js configuration is defined in `next.config.ts` at the project root:
+
+```typescript next.config.ts
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  output: "standalone",
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  reactStrictMode: false,
+};
+
+export default nextConfig;
+```
+
+### Configuration options
+
+<Accordion title="output: 'standalone'">
+  Enables standalone output mode for optimized production builds. This creates a minimal server with all dependencies bundled.
+
+  **Benefits:**
+  - Smaller Docker images
+  - Faster deployments
+  - Self-contained deployment artifacts
+
+  The build script copies static files after build:
+
+  ```json package.json
+  "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/"
+  ```
+</Accordion>
+
+<Accordion title="typescript.ignoreBuildErrors">
+  Set to `true` for flexible development. TypeScript errors won't block builds.
+
+  **For production:**
+  ```typescript next.config.ts
+  typescript: {
+    ignoreBuildErrors: false, // Enable strict checking
+  },
+  ```
+
+  Run type checking manually:
+  ```bash
+  bun run lint
+  ```
+</Accordion>
+
+<Accordion title="reactStrictMode">
+  Currently set to `false`. Enable for additional development checks:
+
+  ```typescript next.config.ts
+  reactStrictMode: true,
+  ```
+
+  <Note>
+    Strict mode helps identify potential problems but may cause components to render twice in development.
+  </Note>
+</Accordion>
+
+### Additional configuration options
+
+You can extend `next.config.ts` with additional options:
+
+```typescript next.config.ts
+const nextConfig: NextConfig = {
+  output: "standalone",
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  reactStrictMode: false,
+  
+  // Image optimization
+  images: {
+    domains: ['example.com'],
+    formats: ['image/avif', 'image/webp'],
+  },
+  
+  // Custom headers
+  async headers() {
+    return [
+      {
+        source: '/api/:path*',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+        ],
+      },
+    ];
+  },
+  
+  // Rewrites for API proxying
+  async rewrites() {
+    return [
+      {
+        source: '/api/external/:path*',
+        destination: 'https://external-api.com/:path*',
+      },
+    ];
+  },
+};
+```
+
+## TypeScript configuration
+
+The TypeScript configuration is defined in `tsconfig.json`:
+
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "noImplicitAny": false,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": ["node_modules"]
+}
+```
+
+### Path aliases
+
+The `@/*` alias maps to the `src` directory:
+
+```typescript
+// Instead of:
+import { Button } from '../../../components/ui/button'
+
+// Use:
+import { Button } from '@/components/ui/button'
+```
+
+<Tip>
+  Add custom path aliases to simplify imports throughout your application.
+</Tip>
+
+## Tailwind CSS configuration
+
+Tailwind CSS is configured in `tailwind.config.ts`:
+
+```typescript tailwind.config.ts
+import type { Config } from "tailwindcss";
+import tailwindcssAnimate from "tailwindcss-animate";
+
+const config: Config = {
+  darkMode: "class",
+  content: [
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
+        card: {
+          DEFAULT: 'hsl(var(--card))',
+          foreground: 'hsl(var(--card-foreground))'
+        },
+        // ... more color definitions
+      },
+      borderRadius: {
+        lg: 'var(--radius)',
+        md: 'calc(var(--radius) - 2px)',
+        sm: 'calc(var(--radius) - 4px)'
+      }
+    }
+  },
+  plugins: [tailwindcssAnimate],
+};
+
+export default config;
+```
+
+### Dark mode
+
+Coffee Finder uses class-based dark mode:
+
+```typescript tailwind.config.ts
+darkMode: "class"
+```
+
+Toggle dark mode by adding the `dark` class to the `<html>` element. This is handled automatically by `next-themes`.
+
+### CSS variables
+
+Colors are defined using CSS variables in `src/app/globals.css`:
+
+```css globals.css
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  /* ... more variables */
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  /* ... dark mode variables */
+}
+```
+
+<Info>
+  Learn how to customize these colors in the [Customization guide](/guides/customization).
+</Info>
+
+## Database configuration
+
+The database is configured using Prisma in `prisma/schema.prisma`:
+
+```prisma prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  title     String
+  content   String?
+  published Boolean  @default(false)
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+```
+
+### Switching to PostgreSQL
+
+To use PostgreSQL instead of SQLite:
+
+<Steps>
+  <Step title="Update Prisma schema">
+    ```prisma prisma/schema.prisma
+    datasource db {
+      provider = "postgresql"
+      url      = env("DATABASE_URL")
+    }
+    ```
+  </Step>
+
+  <Step title="Update environment variable">
+    ```env .env
+    DATABASE_URL="postgresql://user:password@localhost:5432/coffee_finder?schema=public"
+    ```
+  </Step>
+
+  <Step title="Install PostgreSQL client">
+    ```bash
+    bun add @prisma/client
+    ```
+  </Step>
+
+  <Step title="Run migrations">
+    ```bash
+    bun run db:migrate
+    ```
+  </Step>
+</Steps>
+
+### Prisma client configuration
+
+The Prisma client is initialized in `src/lib/db.ts`:
+
+```typescript src/lib/db.ts
+import { PrismaClient } from '@prisma/client'
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined
+}
+
+export const db =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log: ['query'], // Log all queries in development
+  })
+
+if (process.env.NODE_ENV !== 'production') 
+  globalForPrisma.prisma = db
+```
+
+<Accordion title="Prisma logging levels">
+  Configure logging for different environments:
+
+  ```typescript
+  // Development: verbose logging
+  new PrismaClient({
+    log: ['query', 'info', 'warn', 'error'],
+  })
+
+  // Production: errors only
+  new PrismaClient({
+    log: ['error'],
+  })
+
+  // Disable all logging
+  new PrismaClient({
+    log: [],
+  })
+  ```
+</Accordion>
+
+## Environment variables
+
+Coffee Finder uses environment variables for configuration. Create a `.env` file:
+
+```env .env
+# Required
+DATABASE_URL="file:./db/custom.db"
+
+# Application
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+NODE_ENV="development"
+
+# Optional: External APIs
+OVERPASS_API_URL="https://overpass-api.de/api/interpreter"
+```
+
+### Environment variable reference
+
+| Variable | Required | Description | Default |
+|----------|----------|-------------|----------|
+| `DATABASE_URL` | Yes | Database connection string | - |
+| `NEXT_PUBLIC_APP_URL` | No | Public application URL | `http://localhost:3000` |
+| `NODE_ENV` | No | Environment mode | `development` |
+| `OVERPASS_API_URL` | No | OpenStreetMap API endpoint | `https://overpass-api.de/api/interpreter` |
+
+<Warning>
+  Variables prefixed with `NEXT_PUBLIC_` are exposed to the browser. Never store secrets in these variables.
+</Warning>
+
+### Environment-specific files
+
+Create separate environment files for different stages:
+
+```bash
+.env                  # Default (committed to git as template)
+.env.local            # Local overrides (gitignored)
+.env.development      # Development environment
+.env.production       # Production environment
+.env.test             # Test environment
+```
+
+<Info>
+  Next.js automatically loads the correct file based on `NODE_ENV`.
+</Info>
+
+## shadcn/ui configuration
+
+The UI component library is configured in `components.json`:
+
+```json components.json
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/app/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  },
+  "iconLibrary": "lucide"
+}
+```
+
+### Adding new components
+
+Install additional shadcn/ui components:
+
+```bash
+bun x shadcn@latest add button
+bun x shadcn@latest add dialog
+bun x shadcn@latest add dropdown-menu
+```
+
+<Tip>
+  Browse available components at [ui.shadcn.com](https://ui.shadcn.com).
+</Tip>
+
+## API configuration
+
+The coffee shop search API is configured in `src/app/api/coffee-shops/route.ts`:
+
+```typescript src/app/api/coffee-shops/route.ts
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url)
+  const lat = searchParams.get('lat')
+  const lng = searchParams.get('lng')
+  const radius = searchParams.get('radius') || '8000'
+
+  // Query Overpass API for coffee shops
+  const response = await fetch(
+    process.env.OVERPASS_API_URL || 'https://overpass-api.de/api/interpreter',
+    {
+      method: 'POST',
+      body: overpassQuery,
+      next: { revalidate: 120 }, // Cache for 2 minutes
+    }
+  )
+  // ...
+}
+```
+
+### Adjust search parameters
+
+Modify default search behavior:
+
+```typescript
+// Increase search radius
+const radius = searchParams.get('radius') || '15000' // 15km
+
+// Adjust cache duration
+next: { revalidate: 300 } // 5 minutes
+
+// Increase timeout
+[out:json][timeout:60]; // 60 seconds
+```
+
+## Map configuration
+
+Leaflet map styles are configured in `src/app/globals.css`:
+
+```css globals.css
+.coffee-finder-user-pin div {
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background-color: var(--primary);
+  border: 3px solid var(--background);
+}
+
+.coffee-finder-shop-pin div {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background-color: var(--chart-1);
+  border: 1px solid var(--foreground);
+}
+```
+
+Customize pin sizes, colors, and styles by modifying these classes.
+
+## Next steps
+
+With your configuration complete:
+
+- [Deploy your application](/guides/deployment) - Deploy to production
+- [Customize the theme](/guides/customization) - Modify colors and styling
+- [Explore the API](/api/coffee-shops) - Learn about API endpoints

@@ -1,0 +1,285 @@
+---
+title: Introduction to Coffee Finder
+description: A modern SaaS application to discover nearby coffee shops using real-time geolocation, interactive maps, and the Overpass API
+---
+
+<img
+  className="block dark:hidden"
+  src="https://z-cdn.chatglm.cn/z-ai/static/logo.svg"
+  alt="Coffee Finder Hero Light"
+/>
+<img
+  className="hidden dark:block"
+  src="https://z-cdn.chatglm.cn/z-ai/static/logo.svg"
+  alt="Coffee Finder Hero Dark"
+/>
+
+## Welcome to Coffee Finder
+
+Coffee Finder is a production-ready SaaS web application that helps users discover nearby coffee shops using real-time geolocation and interactive map visualization. Built with Next.js 16, TypeScript, and powered by the Overpass API, it delivers a seamless coffee discovery experience.
+
+<CardGroup cols={2}>
+  <Card
+    title="Quick start"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get up and running in under 5 minutes with our comprehensive quick start guide
+  </Card>
+  <Card
+    title="API reference"
+    icon="code"
+    href="/api/overview"
+  >
+    Explore the Coffee Finder API endpoints and data structures
+  </Card>
+  <Card
+    title="Features"
+    icon="palette"
+    href="/features/geolocation"
+  >
+    Learn about the core features including geolocation, maps, and search
+  </Card>
+  <Card
+    title="Deployment"
+    icon="cloud"
+    href="/guides/deployment"
+  >
+    Deploy Coffee Finder to production with our step-by-step guides
+  </Card>
+</CardGroup>
+
+## Key features
+
+Coffee Finder combines modern web technologies to deliver a rich user experience:
+
+### Real-time geolocation
+
+Utilize the browser's Geolocation API to pinpoint user location with high accuracy. The app handles permission requests, error states, and location updates seamlessly.
+
+```typescript src/app/page.tsx
+navigator.geolocation.getCurrentPosition(
+  (position) => {
+    setLocation({
+      lat: position.coords.latitude,
+      lng: position.coords.longitude,
+      loading: false,
+      error: null
+    })
+  },
+  (error) => {
+    // Handle permission denied, unavailable, or timeout errors
+  },
+  { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+)
+```
+
+### Interactive map visualization
+
+Powered by Leaflet and React Leaflet, the application renders an interactive map with custom markers, popups, and smooth animations.
+
+```tsx src/components/leaflet-map-inner.tsx
+<MapContainer center={centerPosition} zoom={zoom} className={className} zoomControl={true}>
+  <TileLayer
+    attribution='&copy; OpenStreetMap contributors'
+    url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+  />
+  <Marker position={centerPosition} icon={userLocationIcon} />
+  {markers.map((marker) => (
+    <Marker
+      key={marker.id}
+      position={[marker.position.lat, marker.position.lng]}
+      icon={shopIcon}
+    >
+      <Popup>{/* Shop details */}</Popup>
+    </Marker>
+  ))}
+</MapContainer>
+```
+
+### Coffee shop discovery via Overpass API
+
+Query OpenStreetMap data through the Overpass API to find coffee shops within a customizable radius. The API endpoint handles location-based searches with optional text filtering.
+
+```typescript src/app/api/coffee-shops/route.ts
+const overpassQuery = `
+[out:json][timeout:25];
+(
+  node["amenity"="cafe"]${nameFilter}(around:${radiusMeters},${latitude},${longitude});
+  way["amenity"="cafe"]${nameFilter}(around:${radiusMeters},${latitude},${longitude});
+  relation["amenity"="cafe"]${nameFilter}(around:${radiusMeters},${latitude},${longitude});
+);
+out center tags;
+`
+
+const response = await fetch('https://overpass-api.de/api/interpreter', {
+  method: 'POST',
+  headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+  body: overpassQuery,
+  next: { revalidate: 120 }
+})
+```
+
+### Advanced filtering and sorting
+
+Discover coffee shops through three distinct modes:
+
+<CardGroup cols={3}>
+  <Card title="All" icon="list">
+    View all coffee shops sorted by distance from your location
+  </Card>
+  <Card title="Popular" icon="star">
+    Top-rated shops based on ratings and review count
+  </Card>
+  <Card title="Trending" icon="fire">
+    Smart scoring algorithm considering open status, ratings, and proximity
+  </Card>
+</CardGroup>
+
+```typescript src/app/page.tsx
+const trendingShops = useMemo(() => {
+  const scoreShop = (shop: CoffeeShop) => {
+    const openScore = shop.isOpen ? 3 : 0
+    const ratingScore = (shop.rating || 0) / 2
+    const engagementScore = (shop.totalRatings || 0) / 200
+    const infoScore = (shop.website ? 1 : 0) + (shop.phone ? 1 : 0)
+    const distancePenalty = Math.min((shop.distance || 3000) / 1000, 3)
+    return openScore + ratingScore + engagementScore + infoScore - distancePenalty
+  }
+
+  return [...coffeeShops]
+    .sort((a, b) => scoreShop(b) - scoreShop(a))
+    .slice(0, 10)
+}, [coffeeShops])
+```
+
+### Distance calculation
+
+Accurate distance computation using the Haversine formula to calculate great-circle distances between coordinates.
+
+```typescript src/app/api/coffee-shops/route.ts
+function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const radius = 6371000 // Earth's radius in meters
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLng = ((lng2 - lng1) * Math.PI) / 180
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return radius * c
+}
+```
+
+### Rich UI with shadcn/ui
+
+Built on top of Radix UI primitives, Coffee Finder uses shadcn/ui components for a polished, accessible interface:
+
+- **Cards** - Structured content display for shop details and map containers
+- **Badges** - Visual indicators for ratings, open status, and distance
+- **Tabs** - Seamless switching between All, Popular, and Trending modes
+- **Scroll Areas** - Smooth scrolling through long lists of coffee shops
+- **Buttons** - Interactive controls with loading states and variants
+- **Input** - Search functionality with icon integration
+- **Skeleton** - Loading placeholders for better perceived performance
+
+<Info>
+  All components support dark mode out of the box using next-themes
+</Info>
+
+### Responsive mobile-first design
+
+The application adapts beautifully across all device sizes with Tailwind CSS utility classes:
+
+```tsx src/app/page.tsx
+<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  {/* Map Section */}
+  <div className="lg:col-span-2 order-2 lg:order-1">
+    <GoogleMap
+      center={{ lat: location.lat, lng: location.lng }}
+      markers={mapMarkers}
+      zoom={15}
+      className="w-full h-[400px] md:h-[500px] lg:h-[600px]"
+    />
+  </div>
+  
+  {/* Coffee Shops List */}
+  <div className="lg:col-span-1 order-1 lg:order-2">
+    {/* Shop listing */}
+  </div>
+</div>
+```
+
+## Technology stack
+
+Coffee Finder is built with modern, production-ready technologies:
+
+<CardGroup cols={2}>
+  <Card title="Next.js 16" icon="react">
+    React framework with App Router, Server Components, and optimized builds
+  </Card>
+  <Card title="TypeScript 5" icon="code">
+    Type-safe development with full IntelliSense support
+  </Card>
+  <Card title="Tailwind CSS 4" icon="palette">
+    Utility-first CSS framework for rapid UI development
+  </Card>
+  <Card title="shadcn/ui" icon="puzzle-piece">
+    High-quality, accessible components built on Radix UI
+  </Card>
+  <Card title="Leaflet" icon="map">
+    Leading open-source library for mobile-friendly interactive maps
+  </Card>
+  <Card title="React Leaflet" icon="layer-group">
+    React components for Leaflet maps
+  </Card>
+  <Card title="Lucide React" icon="shapes">
+    Beautiful, consistent icon library with 1000+ icons
+  </Card>
+  <Card title="Zustand" icon="database">
+    Lightweight state management (if needed for future features)
+  </Card>
+</CardGroup>
+
+## Architecture
+
+Coffee Finder follows a clean, scalable architecture:
+
+```
+src/
+├── app/
+│   ├── api/
+│   │   └── coffee-shops/
+│   │       └── route.ts          # Overpass API integration
+│   ├── layout.tsx                # Root layout with metadata
+│   └── page.tsx                  # Main application page
+├── components/
+│   ├── google-map.tsx            # Map wrapper component
+│   ├── leaflet-map-inner.tsx     # Leaflet map implementation
+│   └── ui/                       # shadcn/ui components
+└── hooks/
+    └── use-toast.ts              # Toast notifications
+```
+
+<Note>
+  The architecture separates concerns between UI components, API routes, and business logic for maintainability
+</Note>
+
+## What's next?
+
+<CardGroup cols={2}>
+  <Card
+    title="Quick start guide"
+    icon="play"
+    href="/quickstart"
+  >
+    Install and run Coffee Finder in under 5 minutes
+  </Card>
+  <Card
+    title="API documentation"
+    icon="book"
+    href="/api/overview"
+  >
+    Explore the coffee shop search API and data models
+  </Card>
+</CardGroup>

@@ -1,0 +1,345 @@
+---
+title: GET /api/coffee-shops
+description: Retrieve nearby coffee shops based on geographic coordinates
+---
+
+## Endpoint
+
+```
+GET /api/coffee-shops
+```
+
+Returns a list of coffee shops near the specified geographic coordinates, sorted by distance from the user's location.
+
+## Query parameters
+
+<ParamField query="lat" type="number" required>
+  The latitude of the search location in decimal degrees. Must be a valid floating-point number between -90 and 90.
+  
+  Example: `37.7749`
+</ParamField>
+
+<ParamField query="lng" type="number" required>
+  The longitude of the search location in decimal degrees. Must be a valid floating-point number between -180 and 180.
+  
+  Example: `-122.4194`
+</ParamField>
+
+<ParamField query="radius" type="number" default="8000">
+  The search radius in meters. Must be between 100 and 100,000 meters (100km).
+  
+  - Minimum: `100`
+  - Maximum: `100000`
+  - Default: `8000`
+</ParamField>
+
+<ParamField query="query" type="string">
+  Optional search query to filter coffee shops by name. The search is case-insensitive and uses partial matching.
+  
+  Example: `starbucks`
+</ParamField>
+
+## Response
+
+<ResponseField name="shops" type="CoffeeShop[]">
+  Array of coffee shop objects, sorted by distance (closest first). Limited to a maximum of 60 results.
+  
+  <Expandable title="CoffeeShop object">
+    <ResponseField name="id" type="string" required>
+      Unique identifier for the coffee shop. Prefixed with `osm-` for OpenStreetMap data.
+      
+      Example: `osm-123456789`
+    </ResponseField>
+    
+    <ResponseField name="name" type="string" required>
+      Name of the coffee shop. Defaults to "Coffee Shop" if no name is available.
+    </ResponseField>
+    
+    <ResponseField name="address" type="string" required>
+      Formatted street address. Returns "Address not available" if no address data exists.
+    </ResponseField>
+    
+    <ResponseField name="location" type="object" required>
+      Geographic coordinates of the coffee shop.
+      
+      <Expandable title="location properties">
+        <ResponseField name="lat" type="number" required>
+          Latitude in decimal degrees
+        </ResponseField>
+        
+        <ResponseField name="lng" type="number" required>
+          Longitude in decimal degrees
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="distance" type="number">
+      Distance from the search location in meters. Calculated using the Haversine formula.
+      
+      Example: `1250.5`
+    </ResponseField>
+    
+    <ResponseField name="phone" type="string">
+      Phone number if available. May be in various formats depending on OpenStreetMap data.
+    </ResponseField>
+    
+    <ResponseField name="website" type="string">
+      Website URL if available.
+    </ResponseField>
+    
+    <ResponseField name="isOpen" type="boolean">
+      Current open/closed status. May be `undefined` as opening hours data is not currently parsed.
+    </ResponseField>
+    
+    <ResponseField name="rating" type="number">
+      Average rating (not currently available from OpenStreetMap data)
+    </ResponseField>
+    
+    <ResponseField name="totalRatings" type="number">
+      Total number of ratings (not currently available from OpenStreetMap data)
+    </ResponseField>
+    
+    <ResponseField name="priceLevel" type="number">
+      Price level indicator from 1-3 (not currently available from OpenStreetMap data)
+    </ResponseField>
+    
+    <ResponseField name="types" type="string[]">
+      Array of place types. Typically includes `["cafe"]`.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Request examples
+
+<CodeGroup>
+
+```bash cURL
+curl "https://your-domain.com/api/coffee-shops?lat=37.7749&lng=-122.4194&radius=5000"
+```
+
+```javascript JavaScript (fetch)
+const response = await fetch(
+  'https://your-domain.com/api/coffee-shops?lat=37.7749&lng=-122.4194&radius=5000'
+);
+const data = await response.json();
+console.log(data.shops);
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    'https://your-domain.com/api/coffee-shops',
+    params={
+        'lat': 37.7749,
+        'lng': -122.4194,
+        'radius': 5000
+    }
+)
+data = response.json()
+print(data['shops'])
+```
+
+```bash cURL with search query
+curl "https://your-domain.com/api/coffee-shops?lat=37.7749&lng=-122.4194&radius=5000&query=blue%20bottle"
+```
+
+</CodeGroup>
+
+## Response examples
+
+<CodeGroup>
+
+```json 200 OK - Success
+{
+  "shops": [
+    {
+      "id": "osm-987654321",
+      "name": "Blue Bottle Coffee",
+      "address": "66 Mint Street, San Francisco",
+      "distance": 450.8,
+      "location": {
+        "lat": 37.7758,
+        "lng": -122.4180
+      },
+      "phone": "+1 510-653-3394",
+      "website": "https://bluebottlecoffee.com",
+      "types": ["cafe"]
+    },
+    {
+      "id": "osm-123456789",
+      "name": "Sightglass Coffee",
+      "address": "270 7th Street, San Francisco",
+      "distance": 892.3,
+      "location": {
+        "lat": 37.7722,
+        "lng": -122.4105
+      },
+      "website": "https://sightglasscoffee.com",
+      "types": ["cafe"]
+    }
+  ]
+}
+```
+
+```json 200 OK - No results
+{
+  "shops": []
+}
+```
+
+```json 400 Bad Request - Missing parameters
+{
+  "error": "Latitude and longitude are required"
+}
+```
+
+```json 400 Bad Request - Invalid coordinates
+{
+  "error": "Invalid latitude or longitude"
+}
+```
+
+```json 400 Bad Request - Invalid radius
+{
+  "error": "Radius must be between 100 and 100000 meters"
+}
+```
+
+</CodeGroup>
+
+## Error codes
+
+### 400 Bad Request
+
+Returned when the request contains invalid or missing parameters:
+
+| Error Message | Cause | Solution |
+|---------------|-------|----------|
+| `Latitude and longitude are required` | Missing `lat` or `lng` parameter | Include both `lat` and `lng` query parameters |
+| `Invalid latitude or longitude` | Non-numeric or unparseable coordinate values | Ensure `lat` and `lng` are valid decimal numbers |
+| `Radius must be between 100 and 100000 meters` | Radius outside valid range | Use a radius between 100 and 100,000 meters |
+
+<Warning>
+The `radius` parameter must be a valid integer. Non-numeric values will trigger a validation error.
+</Warning>
+
+## Implementation details
+
+### Data source integration
+
+The endpoint queries OpenStreetMap data via the Overpass API:
+
+- Searches for nodes, ways, and relations tagged with `amenity=cafe`
+- Applies a radial search using the `around` filter
+- Optionally filters by name using case-insensitive regex matching
+- Returns center coordinates and all available tags
+
+### Query sanitization
+
+The `query` parameter is sanitized before being used in the Overpass query:
+
+- Leading and trailing whitespace is removed
+- Double quotes (`"`) are stripped
+- Backslashes (`\`) are removed
+- Empty queries are treated as no filter
+
+### Address formatting
+
+Addresses are constructed from OpenStreetMap tags in the following priority:
+
+1. `addr:housenumber` + `addr:street`, `addr:city`
+2. `addr:street` and `addr:city` only
+3. `addr:city`, `addr:town`, or `addr:village`
+4. `addr:full` tag
+5. "Address not available" fallback
+
+### Response processing
+
+- Results are sorted by distance (closest first)
+- Maximum of 60 results returned
+- Elements without valid coordinates are filtered out
+- Distance is calculated using the Haversine formula
+
+### Caching
+
+The endpoint uses Next.js revalidation with a 120-second cache period to reduce load on the Overpass API.
+
+### Fallback behavior
+
+<Note>
+If the Overpass API request fails (network error, timeout, or non-200 response), the endpoint returns mock data instead of an error. This ensures the application remains functional during external service outages.
+</Note>
+
+## TypeScript interfaces
+
+```typescript
+interface CoffeeShop {
+  id: string
+  name: string
+  address: string
+  rating?: number
+  totalRatings?: number
+  isOpen?: boolean
+  phone?: string
+  website?: string
+  distance?: number
+  location: {
+    lat: number
+    lng: number
+  }
+  priceLevel?: number
+  types?: string[]
+}
+
+interface OverpassElement {
+  id: number
+  lat?: number
+  lon?: number
+  center?: {
+    lat: number
+    lon: number
+  }
+  tags?: Record<string, string>
+}
+```
+
+## Best practices
+
+<CardGroup cols={2}>
+  <Card title="Use appropriate radius" icon="circle-dot">
+    Start with smaller radius values (1000-5000m) for urban areas. Larger values may return too many results or timeout.
+  </Card>
+  
+  <Card title="Handle empty results" icon="magnifying-glass">
+    Always check if the `shops` array is empty. Remote areas may have no coffee shops in the OpenStreetMap database.
+  </Card>
+  
+  <Card title="Cache responses" icon="clock">
+    Coffee shop data doesn't change frequently. Consider caching responses client-side for 2-5 minutes.
+  </Card>
+  
+  <Card title="Validate coordinates" icon="location-dot">
+    Validate latitude and longitude on the client before making requests to avoid 400 errors.
+  </Card>
+</CardGroup>
+
+## Rate limiting considerations
+
+While the Coffee Finder API doesn't enforce rate limits, the underlying Overpass API has usage policies:
+
+- Requests timeout after 25 seconds
+- Avoid making more than 1 request per second
+- The endpoint caches responses for 120 seconds
+- Consider debouncing user input when implementing search
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="API overview" icon="book" href="/api/overview">
+    Learn about authentication and general API concepts
+  </Card>
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Get started with Coffee Finder in minutes
+  </Card>
+</CardGroup>

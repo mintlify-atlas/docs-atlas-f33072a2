@@ -1,0 +1,214 @@
+---
+title: Geolocation
+description: Real-time user location detection using the browser Geolocation API to find nearby coffee shops
+---
+
+Coffee Finder uses the browser's native Geolocation API to automatically detect your current location and display relevant coffee shops in your area. The geolocation system handles permissions, errors, and provides real-time updates.
+
+## How geolocation works
+
+When you first visit Coffee Finder, the application:
+
+1. Requests permission to access your location
+2. Retrieves high-accuracy GPS coordinates
+3. Centers the map on your position
+4. Fetches nearby coffee shops within an 8km radius
+5. Displays your location with a distinct marker
+
+<Note>
+The geolocation feature requires browser permission. Users will see a permission prompt on their first visit.
+</Note>
+
+## Location state management
+
+The application tracks location state using a dedicated interface:
+
+```typescript src/app/page.tsx
+interface LocationState {
+  lat: number | null
+  lng: number | null
+  loading: boolean
+  error: string | null
+}
+```
+
+This state structure enables the UI to display appropriate feedback during location detection, errors, or successful retrieval.
+
+## User experience flows
+
+<Tabs>
+  <Tab title="First visit">
+    1. User lands on Coffee Finder
+    2. Browser displays permission prompt: "Allow Coffee Finder to access your location?"
+    3. User grants permission
+    4. Loading indicator appears: "Getting your location..."
+    5. Map centers on user's coordinates
+    6. Nearby coffee shops appear on the map and in the sidebar
+  </Tab>
+  
+  <Tab title="Permission denied">
+    1. User denies location permission
+    2. Error card displays: "Location permission denied. Please enable location access."
+    3. "Try Again" button allows user to re-request permission
+    4. Map remains empty until permission is granted
+  </Tab>
+  
+  <Tab title="Location unavailable">
+    1. GPS signal is weak or unavailable
+    2. Error message: "Location information is unavailable"
+    3. User can manually refresh location
+    4. System retries with 10-second timeout
+  </Tab>
+</Tabs>
+
+## Implementation details
+
+The `getCurrentLocation` function handles all location retrieval logic:
+
+```typescript src/app/page.tsx
+const getCurrentLocation = useCallback(() => {
+  setLocation(prev => ({ ...prev, loading: true, error: null }))
+  
+  if (!navigator.geolocation) {
+    setLocation({
+      lat: null,
+      lng: null,
+      loading: false,
+      error: 'Geolocation is not supported by your browser'
+    })
+    return
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      setLocation({
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        loading: false,
+        error: null
+      })
+    },
+    (error) => {
+      let errorMessage = 'Unable to get your location'
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          errorMessage = 'Location permission denied. Please enable location access.'
+          break
+        case error.POSITION_UNAVAILABLE:
+          errorMessage = 'Location information is unavailable'
+          break
+        case error.TIMEOUT:
+          errorMessage = 'Location request timed out'
+          break
+      }
+      setLocation({
+        lat: null,
+        lng: null,
+        loading: false,
+        error: errorMessage
+      })
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  )
+}, [])
+```
+
+### Configuration options
+
+The geolocation request uses these settings:
+
+<Accordion title="enableHighAccuracy: true">
+  Requests the most accurate position available, typically using GPS. This provides better precision for finding nearby coffee shops but may take longer and consume more battery.
+</Accordion>
+
+<Accordion title="timeout: 10000">
+  Sets a 10-second maximum wait time for location detection. If the device cannot determine location within this timeframe, a timeout error is triggered.
+</Accordion>
+
+<Accordion title="maximumAge: 0">
+  Prevents using cached location data, ensuring the freshest possible coordinates. This is essential for accurate "nearby" results.
+</Accordion>
+
+## Error handling
+
+Coffee Finder provides specific error messages for different failure scenarios:
+
+| Error Code | User Message | Common Cause |
+|------------|--------------|-------------|
+| `PERMISSION_DENIED` | Location permission denied. Please enable location access. | User declined permission or browser settings block access |
+| `POSITION_UNAVAILABLE` | Location information is unavailable | GPS signal is weak, device is indoors, or location services are disabled |
+| `TIMEOUT` | Location request timed out | Network issues or slow GPS acquisition |
+| Browser not supported | Geolocation is not supported by your browser | Using an outdated browser |
+
+<Warning>
+If geolocation fails repeatedly, users should check:
+- Browser location permissions in settings
+- System-level location services are enabled
+- Connection to GPS satellites (may require being outdoors)
+- Browser compatibility with Geolocation API
+</Warning>
+
+## Refresh location
+
+Users can manually refresh their location at any time:
+
+```tsx src/app/page.tsx
+<Button 
+  variant="outline" 
+  size="sm" 
+  onClick={getCurrentLocation}
+  disabled={location.loading}
+>
+  {location.loading ? (
+    <Loader2 className="w-4 h-4 animate-spin" />
+  ) : (
+    <Locate className="w-4 h-4" />
+  )}
+  <span className="ml-2">Refresh</span>
+</Button>
+```
+
+The refresh button:
+- Shows a loading spinner during location detection
+- Disables to prevent multiple simultaneous requests
+- Re-fetches coffee shops after getting new coordinates
+- Updates the map center to the new location
+
+## Automatic initialization
+
+Location detection starts automatically when the app loads:
+
+```typescript src/app/page.tsx
+useEffect(() => {
+  getCurrentLocation()
+}, [getCurrentLocation])
+```
+
+Once location is detected, coffee shops are automatically fetched:
+
+```typescript src/app/page.tsx
+useEffect(() => {
+  if (location.lat && location.lng) {
+    fetchCoffeeShops(location.lat, location.lng)
+  }
+}, [location.lat, location.lng, fetchCoffeeShops])
+```
+
+<Info>
+This automatic flow ensures users see relevant coffee shops immediately after granting location permission, creating a seamless discovery experience.
+</Info>
+
+## Browser compatibility
+
+The Geolocation API is supported in all modern browsers:
+
+- Chrome 5+
+- Firefox 3.5+
+- Safari 5+
+- Edge (all versions)
+- Opera 10.6+
+- Mobile browsers (iOS Safari, Chrome Mobile)
+
+<Tip>
+For the best experience, users should access Coffee Finder from a device with GPS capabilities (smartphones, tablets) rather than desktop computers, which typically rely on less accurate IP-based geolocation.
+</Tip>

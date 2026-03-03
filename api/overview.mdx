@@ -1,0 +1,107 @@
+---
+title: API Overview
+description: Learn how to integrate with the Coffee Finder API to discover nearby coffee shops
+---
+
+## Introduction
+
+The Coffee Finder API provides a simple REST interface for discovering coffee shops near any geographic location. The API leverages OpenStreetMap data via the Overpass API to return real-world coffee shop information.
+
+## Base URL
+
+All API requests are made to:
+
+```
+https://your-domain.com/api
+```
+
+## Authentication
+
+The Coffee Finder API currently does not require authentication. All endpoints are publicly accessible.
+
+<Note>
+Future versions of the API may introduce rate limiting and API key requirements. Check back for updates.
+</Note>
+
+## Request format
+
+All requests are made using standard HTTP methods. Query parameters should be URL-encoded.
+
+### Content type
+
+The API accepts requests with query parameters in the URL. No request body is required for GET endpoints.
+
+## Response format
+
+All responses are returned in JSON format with appropriate HTTP status codes.
+
+### Success response
+
+Successful requests return a `200 OK` status with a JSON object:
+
+```json
+{
+  "shops": [
+    // Array of coffee shop objects
+  ]
+}
+```
+
+### Error response
+
+Error responses include an error message and appropriate HTTP status code:
+
+```json
+{
+  "error": "Error message description"
+}
+```
+
+## Status codes
+
+The API uses standard HTTP status codes:
+
+| Status Code | Description |
+|-------------|-------------|
+| `200` | Success - Request completed successfully |
+| `400` | Bad Request - Invalid or missing required parameters |
+| `500` | Internal Server Error - An unexpected error occurred |
+
+## Rate limiting
+
+<Warning>
+The API relies on the Overpass API, which has its own rate limits. Requests have a 25-second timeout. Avoid making excessive requests in short periods.
+</Warning>
+
+The API implements caching with a 120-second revalidation period to reduce load on external services.
+
+## Data source
+
+Coffee shop data is sourced from OpenStreetMap via the Overpass API. The API queries for nodes, ways, and relations tagged with `amenity=cafe` within the specified search radius.
+
+<Note>
+If the Overpass API is unavailable or returns no results, the API may return mock data for development and testing purposes.
+</Note>
+
+## Distance calculation
+
+Distances are calculated using the Haversine formula, which accounts for the Earth's curvature. All distances are returned in meters.
+
+## Error handling
+
+The API implements graceful error handling:
+
+- **Validation errors** (400): Returned when required parameters are missing or invalid
+- **External API failures**: When Overpass API fails, the endpoint returns mock data instead of an error
+- **Timeout protection**: Overpass queries have a 25-second timeout to prevent hanging requests
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Coffee shops endpoint" icon="coffee" href="/api/coffee-shops">
+    Discover nearby coffee shops using geolocation
+  </Card>
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Get started with Coffee Finder in minutes
+  </Card>
+</CardGroup>

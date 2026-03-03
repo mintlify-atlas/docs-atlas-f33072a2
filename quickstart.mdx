@@ -1,80 +1,309 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick start
+description: Get up and running with Coffee Finder in minutes
 ---
 
-## Get started in three steps
+Coffee Finder is a SaaS web application that helps users discover nearby coffee shops using real-time geolocation and interactive maps powered by OpenStreetMap data.
 
-Get your documentation site running locally and make your first customization.
+<Note>
+This quickstart guide will take you from installation to viewing your first interactive coffee shop map in under 5 minutes.
+</Note>
 
-### Step 1: Set up your local environment
+## Prerequisites
+
+Before you begin, ensure you have one of the following package managers installed:
+
+- [Bun](https://bun.sh/) (recommended)
+- [npm](https://www.npmjs.com/)
+- [Yarn](https://yarnpkg.com/)
+
+<Steps>
+  <Step title="Clone and install dependencies">
+    First, navigate to your project directory and install all required dependencies.
+
+    <CodeGroup>
+    ```bash bun
+    bun install
+    ```
+
+    ```bash npm
+    npm install
+    ```
+
+    ```bash yarn
+    yarn install
+    ```
+    </CodeGroup>
+
+    <Tip>
+    Coffee Finder uses modern technologies including Next.js 16, TypeScript 5, Tailwind CSS 4, and Leaflet for interactive maps.
+    </Tip>
+  </Step>
+
+  <Step title="Start the development server">
+    Launch the development server on port 3000.
+
+    <CodeGroup>
+    ```bash bun
+    bun run dev
+    ```
+
+    ```bash npm
+    npm run dev
+    ```
+
+    ```bash yarn
+    yarn dev
+    ```
+    </CodeGroup>
+
+    Open [http://localhost:3000](http://localhost:3000) in your browser to see the application running.
+
+    <Info>
+    The development server includes hot module replacement (HMR), so changes to your code will automatically refresh in the browser.
+    </Info>
+  </Step>
+
+  <Step title="Grant location permissions">
+    When you first load the application, your browser will request permission to access your location.
+
+    <Warning>
+    Location access is required for Coffee Finder to work. The app uses the Geolocation API to find coffee shops near you.
+    </Warning>
+
+    Click **Allow** when prompted. The app will:
+    
+    1. Request your current coordinates using `navigator.geolocation`
+    2. Center the map on your location
+    3. Automatically fetch nearby coffee shops within an 8km radius
+
+    If you deny permission, you'll see an error message with an option to retry.
+  </Step>
+
+  <Step title="Explore the coffee shop map">
+    Once your location is detected, Coffee Finder displays:
+
+    - **Interactive map** - Powered by Leaflet with OpenStreetMap tiles
+    - **Coffee shop markers** - Each marker represents a nearby café
+    - **Shop details panel** - Shows ratings, distance, hours, and contact info
+
+    <Tabs>
+      <Tab title="View modes">
+        The app offers three discovery modes:
+
+        - **All** - Shows all nearby coffee shops sorted by distance
+        - **Popular** - Highlights top-rated shops with most reviews
+        - **Trending** - Smart algorithm combining ratings, hours, and engagement
+      </Tab>
+
+      <Tab title="Shop information">
+        Each coffee shop displays:
+
+        - Name and full address
+        - Star rating and number of reviews
+        - Open/closed status with visual badge
+        - Distance from your location (meters or kilometers)
+        - Price level indicators (💰💰💰)
+        - Phone number and website links (when available)
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Search and filter coffee shops">
+    Use the search bar at the top to find specific coffee shops by name.
+
+    ```tsx src/app/page.tsx
+    const handleSearch = () => {
+      if (location.lat && location.lng) {
+        fetchCoffeeShops(location.lat, location.lng, searchQuery)
+      }
+    }
+    ```
+
+    The search:
+    
+    - Filters results in real-time using the Overpass API
+    - Supports case-insensitive matching
+    - Maintains your current location context
+    - Press **Enter** or click the search button to execute
+
+    <Tip>
+    Try searching for specific chains, roasters, or keywords like "artisan" or "organic" to narrow your results.
+    </Tip>
+  </Step>
+
+  <Step title="Interact with the map">
+    Click on any coffee shop in the sidebar or on a map marker to:
+
+    - **Pan the map** to that location with smooth animation
+    - **Zoom in** for a closer view (zoom level 17)
+    - **Highlight the shop** in the sidebar
+    - **View detailed information** including contact options
+
+    ```tsx src/app/page.tsx
+    const handleShopSelect = (shop: CoffeeShop) => {
+      setSelectedShop(shop)
+      panToLocation(shop.location.lat, shop.location.lng, 17)
+    }
+    ```
+
+    Click phone icons to call directly or globe icons to visit shop websites.
+  </Step>
+</Steps>
+
+## Understanding the API
+
+Coffee Finder uses the Overpass API to fetch real coffee shop data from OpenStreetMap.
+
+<Accordion title="How the coffee shop API works">
+The `/api/coffee-shops` endpoint accepts the following parameters:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `lat` | number | Yes | Your latitude coordinate |
+| `lng` | number | Yes | Your longitude coordinate |
+| `query` | string | No | Search term to filter shop names |
+| `radius` | number | No | Search radius in meters (default: 8000m) |
+
+**Example request:**
+
+```typescript src/app/api/coffee-shops/route.ts
+const params = new URLSearchParams({
+  lat: lat.toString(),
+  lng: lng.toString(),
+  ...(query && { query })
+})
+
+const response = await fetch(`/api/coffee-shops?${params}`)
+const data = await response.json()
+```
+
+**Response format:**
+
+```json
+{
+  "shops": [
+    {
+      "id": "osm-123456789",
+      "name": "The Cozy Bean",
+      "address": "123 Main Street, San Francisco",
+      "rating": 4.5,
+      "totalRatings": 328,
+      "isOpen": true,
+      "phone": "+1 (555) 123-4567",
+      "website": "https://example.com/cozy-bean",
+      "distance": 450,
+      "location": {
+        "lat": 37.7749,
+        "lng": -122.4194
+      },
+      "priceLevel": 2,
+      "types": ["cafe"]
+    }
+  ]
+}
+```
+
+The API automatically:
+- Queries OpenStreetMap via Overpass API
+- Calculates distances using the Haversine formula
+- Sorts results by proximity
+- Limits results to 60 shops
+- Falls back to mock data if Overpass is unavailable
+
+</Accordion>
+
+## Common features
+
+<CardGroup cols={2}>
+  <Card title="Real-time geolocation" icon="location-dot">
+    Uses the browser's native Geolocation API with high accuracy mode enabled
+  </Card>
+  
+  <Card title="Live data from OpenStreetMap" icon="map">
+    Fetches real coffee shop data including hours, ratings, and contact info
+  </Card>
+  
+  <Card title="Smart discovery modes" icon="sparkles">
+    Filter by all shops, popular spots, or trending cafés with custom scoring
+  </Card>
+  
+  <Card title="Interactive Leaflet maps" icon="map-location-dot">
+    Pan, zoom, and click markers to explore coffee shops visually
+  </Card>
+</CardGroup>
+
+## Troubleshooting
 
 <AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+  <Accordion title="Location permission denied">
+    If you accidentally denied location access:
+
+    1. Click the location icon in your browser's address bar
+    2. Change the permission to **Allow**
+    3. Refresh the page or click the **Refresh** button in the app header
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
+    Alternatively, you can manually enable location in your browser settings under **Privacy & Security** → **Site Settings** → **Location**.
   </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+
+  <Accordion title="No coffee shops appearing">
+    If the map loads but shows no coffee shops:
+
+    - **Check your location** - The app searches within 8km radius
+    - **Verify internet connection** - Overpass API requires connectivity
+    - **Wait a moment** - Initial queries can take 5-10 seconds
+    - **Try a different search** - Use broader terms or clear the search field
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
+    If problems persist, the app will automatically fall back to mock data for testing.
+  </Accordion>
+
+  <Accordion title="Map not displaying">
+    If you see a blank map area:
+
+    - **Check console for errors** - Open browser DevTools (F12)
+    - **Verify Leaflet loaded** - Look for JavaScript errors
+    - **Try a hard refresh** - Press Ctrl+Shift+R (Cmd+Shift+R on Mac)
+    - **Clear browser cache** - Old cached assets may cause issues
+    
+    The map uses OpenStreetMap tiles which require internet access.
+  </Accordion>
+
+  <Accordion title="Development server won't start">
+    If `bun run dev` fails:
+
+    ```bash
+    # Clear node_modules and reinstall
+    rm -rf node_modules
+    bun install
+
+    # Check if port 3000 is in use
+    lsof -i :3000
+    kill -9 <PID>  # If another process is using port 3000
+
+    # Try starting on a different port
+    next dev -p 3001
+    ```
   </Accordion>
 </AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
+Now that you have Coffee Finder running, explore these resources:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Customize the UI" icon="palette" href="/guides/customization">
+    Learn how to modify colors, themes, and component styles
+  </Card>
+  
+  <Card title="Deploy to production" icon="rocket" href="/guides/deployment">
+    Deploy your Coffee Finder instance to Vercel, Netlify, or Docker
+  </Card>
+  
+  <Card title="API reference" icon="code" href="/api/overview">
+    Explore the full API documentation and integration options
+  </Card>
+  
+  <Card title="Configuration guide" icon="gear" href="/guides/configuration">
+    Configure search radius, map settings, and data sources
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

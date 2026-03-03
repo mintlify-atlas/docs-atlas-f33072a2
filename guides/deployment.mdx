@@ -1,0 +1,592 @@
+---
+title: Deployment
+description: Deploy Coffee Finder to production with Docker, Caddy, and various hosting platforms
+---
+
+This guide covers deploying Coffee Finder to production environments. The application is optimized for standalone deployment with Docker and includes a Caddy reverse proxy configuration.
+
+## Build for production
+
+Coffee Finder uses Next.js standalone output mode for optimized production builds.
+
+<Steps>
+  <Step title="Build the application">
+    Run the production build command:
+
+    ```bash
+    bun run build
+    ```
+
+    This command performs the following:
+
+    1. Runs `next build` to create an optimized production bundle
+    2. Copies static assets to the standalone directory
+    3. Copies public files to the standalone directory
+
+    The full build script from `package.json`:
+
+    ```json package.json
+    "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/"
+    ```
+
+    <Info>
+      Standalone mode bundles all dependencies into a single server, reducing deployment size and complexity.
+    </Info>
+  </Step>
+
+  <Step title="Verify build output">
+    After building, check the output structure:
+
+    ```bash
+    ls -la .next/standalone/
+    ```
+
+    You should see:
+    - `server.js` - Production server entry point
+    - `.next/` - Build artifacts and static files
+    - `public/` - Public assets
+    - `package.json` - Minimal production dependencies
+  </Step>
+
+  <Step title="Test production build locally">
+    Start the production server:
+
+    ```bash
+    bun run start
+    ```
+
+    This runs `next start -p 3000`. Visit [http://localhost:3000](http://localhost:3000) to verify the build.
+
+    <Warning>
+      Ensure all environment variables are set before starting the production server.
+    </Warning>
+  </Step>
+</Steps>
+
+## Database preparation
+
+Before deploying, ensure your database is ready for production.
+
+<Steps>
+  <Step title="Run database migrations">
+    Apply all database migrations:
+
+    ```bash
+    bun run db:migrate
+    ```
+
+    <Note>
+      For production databases, use migrations instead of `db:push` to maintain a migration history.
+    </Note>
+  </Step>
+
+  <Step title="Set production DATABASE_URL">
+    Update your `.env` file with the production database URL:
+
+    ```env .env
+    # For PostgreSQL
+    DATABASE_URL="postgresql://user:password@host:5432/coffee_finder?schema=public"
+
+    # For MySQL
+    DATABASE_URL="mysql://user:password@host:3306/coffee_finder"
+
+    # For SQLite (not recommended for production)
+    DATABASE_URL="file:./db/production.db"
+    ```
+  </Step>
+
+  <Step title="Generate Prisma client">
+    Generate the Prisma client for production:
+
+    ```bash
+    bun run db:generate
+    ```
+  </Step>
+</Steps>
+
+## Caddy reverse proxy
+
+Coffee Finder includes a `Caddyfile` for production deployment with automatic HTTPS.
+
+### Caddyfile configuration
+
+The included `Caddyfile` configures Caddy to reverse proxy to the Next.js application:
+
+```caddy Caddyfile
+:81 {
+  @transform_port_query {
+    query XTransformPort=*
+  }
+
+  handle @transform_port_query {
+    reverse_proxy localhost:{query.XTransformPort} {
+      header_up Host {host}
+      header_up X-Forwarded-For {remote_host}
+      header_up X-Forwarded-Proto {scheme}
+      header_up X-Real-IP {remote_host}
+    }
+  }
+
+  handle {
+    reverse_proxy localhost:3000 {
+      header_up Host {host}
+      header_up X-Forwarded-For {remote_host}
+      header_up X-Forwarded-Proto {scheme}
+      header_up X-Real-IP {remote_host}
+    }
+  }
+}
+```
+
+### Understanding the Caddyfile
+
+<Accordion title=":81 directive">
+  Caddy listens on port 81 instead of the standard port 80. This is useful for:
+
+  - Running behind another reverse proxy
+  - Containerized deployments
+  - Development and staging environments
+
+  **For production with a domain:**
+
+  ```caddy Caddyfile
+  coffee-finder.com {
+    reverse_proxy localhost:3000
+  }
+  ```
+
+  Caddy automatically provisions SSL certificates from Let's Encrypt.
+</Accordion>
+
+<Accordion title="@transform_port_query matcher">
+  This matcher allows dynamic port routing based on query parameters:
+
+  ```bash
+  # Route to different service on port 3001
+  curl http://localhost:81?XTransformPort=3001
+  ```
+
+  Useful for multi-service deployments or A/B testing.
+</Accordion>
+
+<Accordion title="Header forwarding">
+  The configuration forwards important headers:
+
+  - `Host` - Original host header
+  - `X-Forwarded-For` - Client IP address
+  - `X-Forwarded-Proto` - Original protocol (http/https)
+  - `X-Real-IP` - Real client IP
+
+  These headers ensure Next.js receives correct client information behind the proxy.
+</Accordion>
+
+### Running with Caddy
+
+<Steps>
+  <Step title="Install Caddy">
+    Install Caddy on your server:
+
+    <CodeGroup>
+      ```bash Ubuntu/Debian
+      sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
+      curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+      curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+      sudo apt update
+      sudo apt install caddy
+      ```
+
+      ```bash macOS
+      brew install caddy
+      ```
+
+      ```bash Docker
+      docker pull caddy:latest
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Start Next.js server">
+    Start the Next.js application:
+
+    ```bash
+    bun run start
+    ```
+
+    Or use a process manager like PM2:
+
+    ```bash
+    pm2 start bun --name coffee-finder -- run start
+    ```
+  </Step>
+
+  <Step title="Start Caddy">
+    Run Caddy with the provided Caddyfile:
+
+    ```bash
+    caddy run --config Caddyfile
+    ```
+
+    Or as a daemon:
+
+    ```bash
+    caddy start --config Caddyfile
+    ```
+
+    The application is now accessible on port 81.
+  </Step>
+</Steps>
+
+## Docker deployment
+
+Deploy Coffee Finder using Docker for consistent, portable deployments.
+
+### Create Dockerfile
+
+Create a `Dockerfile` in the project root:
+
+```dockerfile Dockerfile
+FROM oven/bun:1 AS base
+WORKDIR /app
+
+# Install dependencies
+FROM base AS deps
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
+
+# Build application
+FROM base AS builder
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Set environment to production
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Generate Prisma client
+RUN bun run db:generate
+
+# Build Next.js
+RUN bun run build
+
+# Production image
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Copy built application
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/prisma ./prisma
+
+# Copy database (for SQLite only)
+COPY --from=builder /app/db ./db
+
+RUN chown -R nextjs:nodejs /app
+
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+CMD ["bun", "server.js"]
+```
+
+### Build Docker image
+
+```bash
+docker build -t coffee-finder:latest .
+```
+
+### Run Docker container
+
+```bash
+docker run -d \
+  --name coffee-finder \
+  -p 3000:3000 \
+  -e DATABASE_URL="postgresql://user:password@host:5432/coffee_finder" \
+  coffee-finder:latest
+```
+
+<Warning>
+  For SQLite databases, mount a volume to persist data:
+
+  ```bash
+  docker run -d \
+    -v $(pwd)/db:/app/db \
+    coffee-finder:latest
+  ```
+</Warning>
+
+## Docker Compose
+
+Use Docker Compose for multi-container deployments:
+
+```yaml docker-compose.yml
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/coffee_finder
+      - NODE_ENV=production
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=coffee_finder
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+```
+
+Start all services:
+
+```bash
+docker-compose up -d
+```
+
+## Platform deployments
+
+Deploy Coffee Finder to popular hosting platforms.
+
+### Vercel
+
+Vercel provides the simplest deployment for Next.js applications.
+
+<Steps>
+  <Step title="Install Vercel CLI">
+    ```bash
+    bun add -g vercel
+    ```
+  </Step>
+
+  <Step title="Login to Vercel">
+    ```bash
+    vercel login
+    ```
+  </Step>
+
+  <Step title="Deploy">
+    ```bash
+    vercel --prod
+    ```
+
+    Vercel automatically detects Next.js and configures the deployment.
+  </Step>
+
+  <Step title="Configure environment variables">
+    Add environment variables in the Vercel dashboard or CLI:
+
+    ```bash
+    vercel env add DATABASE_URL production
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  Vercel automatically handles builds, caching, and CDN distribution. No Dockerfile or Caddy configuration needed.
+</Note>
+
+### Railway
+
+Deploy to Railway with automatic PostgreSQL provisioning:
+
+<Steps>
+  <Step title="Create Railway project">
+    ```bash
+    npm i -g @railway/cli
+    railway login
+    railway init
+    ```
+  </Step>
+
+  <Step title="Add PostgreSQL">
+    ```bash
+    railway add --database postgresql
+    ```
+
+    Railway automatically sets `DATABASE_URL`.
+  </Step>
+
+  <Step title="Deploy">
+    ```bash
+    railway up
+    ```
+  </Step>
+</Steps>
+
+### DigitalOcean App Platform
+
+<Steps>
+  <Step title="Connect repository">
+    Link your GitHub repository in the DigitalOcean dashboard.
+  </Step>
+
+  <Step title="Configure build">
+    - Build command: `bun run build`
+    - Run command: `bun run start`
+    - Port: `3000`
+  </Step>
+
+  <Step title="Add database">
+    Provision a managed PostgreSQL database and set the `DATABASE_URL` environment variable.
+  </Step>
+</Steps>
+
+## Environment variables checklist
+
+Before deploying, ensure all required environment variables are set:
+
+- [ ] `DATABASE_URL` - Production database connection string
+- [ ] `NODE_ENV=production` - Set environment to production
+- [ ] `NEXT_PUBLIC_APP_URL` - Public application URL
+- [ ] `OVERPASS_API_URL` - (Optional) Custom Overpass API endpoint
+
+<Tip>
+  Use a secret management service like Doppler, AWS Secrets Manager, or HashiCorp Vault for sensitive credentials.
+</Tip>
+
+## Post-deployment
+
+After deploying:
+
+<Steps>
+  <Step title="Run database migrations">
+    ```bash
+    # SSH into your server
+    bun run db:migrate
+    ```
+  </Step>
+
+  <Step title="Verify health">
+    Check that the application is running:
+
+    ```bash
+    curl https://your-domain.com
+    ```
+  </Step>
+
+  <Step title="Monitor logs">
+    Monitor application logs for errors:
+
+    ```bash
+    # PM2
+    pm2 logs coffee-finder
+
+    # Docker
+    docker logs -f coffee-finder
+
+    # Systemd
+    journalctl -u coffee-finder -f
+    ```
+  </Step>
+
+  <Step title="Set up monitoring">
+    Configure monitoring and alerting with tools like:
+
+    - Sentry for error tracking
+    - LogRocket for session replay
+    - Datadog or New Relic for APM
+  </Step>
+</Steps>
+
+## Performance optimization
+
+<Accordion title="Enable compression">
+  Caddy automatically enables compression. For other reverse proxies, ensure gzip or brotli is enabled.
+</Accordion>
+
+<Accordion title="Configure caching">
+  Add caching headers in `next.config.ts`:
+
+  ```typescript
+  async headers() {
+    return [
+      {
+        source: '/api/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=120, stale-while-revalidate=300',
+          },
+        ],
+      },
+    ];
+  },
+  ```
+</Accordion>
+
+<Accordion title="Use a CDN">
+  Serve static assets from a CDN:
+
+  - Vercel automatically provides CDN
+  - Self-hosted: Use Cloudflare, Fastly, or AWS CloudFront
+</Accordion>
+
+## Troubleshooting
+
+<Accordion title="Build fails with memory error">
+  Increase Node.js memory limit:
+
+  ```json package.json
+  "build": "NODE_OPTIONS='--max-old-space-size=4096' next build && ..."
+  ```
+</Accordion>
+
+<Accordion title="Database connection errors">
+  Verify:
+
+  1. `DATABASE_URL` is correct
+  2. Database server is accessible from application server
+  3. Firewall allows connections
+  4. SSL mode matches database configuration
+</Accordion>
+
+<Accordion title="404 errors on refresh">
+  Ensure your reverse proxy routes all requests to Next.js:
+
+  ```caddy Caddyfile
+  coffee-finder.com {
+    reverse_proxy localhost:3000
+  }
+  ```
+</Accordion>
+
+## Next steps
+
+Your application is now deployed!
+
+- [Customize the theme](/guides/customization) - Brand your application
+- [API reference](/api/overview) - Explore the Coffee Finder API

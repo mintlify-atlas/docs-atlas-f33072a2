@@ -1,0 +1,347 @@
+---
+title: Map integration
+description: Interactive maps powered by Leaflet and OpenStreetMap showing coffee shop locations and user position
+---
+
+Coffee Finder uses Leaflet, a lightweight JavaScript mapping library, combined with OpenStreetMap tiles to display an interactive map of coffee shops near your location. The map provides visual context, clickable markers, and smooth animations.
+
+## Map architecture
+
+The mapping system uses a two-layer component architecture:
+
+```
+GoogleMap (wrapper)
+  └─ LeafletMapInner (implementation)
+      ├─ MapContainer
+      ├─ TileLayer (OpenStreetMap)
+      ├─ User location marker
+      └─ Coffee shop markers
+```
+
+<Info>
+Despite the name `GoogleMap`, this component uses Leaflet and OpenStreetMap for rendering. The naming is for interface consistency and could represent future Google Maps integration.
+</Info>
+
+## Core map component
+
+The `GoogleMap` component provides the public API for rendering maps:
+
+```typescript src/components/google-map.tsx
+interface GoogleMapProps {
+  center: { lat: number; lng: number }
+  markers?: Array<{
+    id: string
+    position: { lat: number; lng: number }
+    title: string
+    address?: string
+    rating?: number
+    totalRatings?: number
+    isOpen?: boolean
+    distance?: number
+    phone?: string
+    website?: string
+    onClick?: () => void
+  }>
+  onMapClick?: (lat: number, lng: number) => void
+  zoom?: number
+  className?: string
+}
+```
+
+### Usage example
+
+```tsx src/app/page.tsx
+<GoogleMap
+  center={{ lat: location.lat, lng: location.lng }}
+  markers={mapMarkers}
+  zoom={15}
+  className="w-full h-[400px] md:h-[500px] lg:h-[600px]"
+/>
+```
+
+## Marker system
+
+Coffee Finder displays two types of markers on the map:
+
+<Tabs>
+  <Tab title="User location marker">
+    A distinctive blue circular marker indicates your current position:
+
+    ```typescript src/components/leaflet-map-inner.tsx
+    const userLocationIcon = divIcon({
+      className: 'coffee-finder-user-pin',
+      html: '<div></div>',
+      iconSize: [20, 20],
+      iconAnchor: [10, 10],
+    })
+    ```
+
+    This marker:
+    - Always appears at the center initially
+    - Remains visible as you pan the map
+    - Updates when you refresh your location
+    - Is larger and more prominent than shop markers
+  </Tab>
+  
+  <Tab title="Coffee shop markers">
+    Coffee shop locations use smaller orange markers:
+
+    ```typescript src/components/leaflet-map-inner.tsx
+    const shopIcon = divIcon({
+      className: 'coffee-finder-shop-pin',
+      html: '<div></div>',
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
+    })
+    ```
+
+    Each marker:
+    - Represents a single coffee shop
+    - Is clickable to show details
+    - Opens a popup with shop information
+    - Highlights when selected from the sidebar
+  </Tab>
+</Tabs>
+
+## Interactive popups
+
+Clicking a coffee shop marker displays a detailed popup:
+
+```tsx src/components/leaflet-map-inner.tsx
+<Popup>
+  <div className="min-w-48 text-sm">
+    <p className="font-semibold text-foreground">{marker.title}</p>
+
+    {marker.address && <p className="text-muted-foreground mt-1">{marker.address}</p>}
+
+    <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+      {marker.rating !== undefined && (
+        <p>
+          Rating: {marker.rating}
+          {marker.totalRatings ? ` (${marker.totalRatings})` : ''}
+        </p>
+      )}
+
+      {marker.distance !== undefined && <p>Distance: {Math.round(marker.distance)}m</p>}
+
+      {marker.isOpen !== undefined && <p>Status: {marker.isOpen ? 'Open' : 'Closed'}</p>}
+
+      {marker.phone && <p>Phone: {marker.phone}</p>}
+
+      {marker.website && (
+        <a
+          href={marker.website}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary underline underline-offset-2"
+        >
+          Visit Website
+        </a>
+      )}
+    </div>
+  </div>
+</Popup>
+```
+
+<Accordion title="Popup contents">
+  Each popup displays:
+  - **Shop name** (bold, prominent)
+  - **Address** (muted text)
+  - **Rating** (if available, with review count)
+  - **Distance** (in meters from your location)
+  - **Status** (Open/Closed)
+  - **Phone number** (if available)
+  - **Website link** (opens in new tab)
+</Accordion>
+
+## Map controls and interactions
+
+The map provides standard Leaflet controls:
+
+| Control | Function | User Action |
+|---------|----------|-------------|
+| Zoom in/out | Adjust map detail level | Click +/- buttons or scroll wheel |
+| Pan | Move around the map | Click and drag |
+| Click marker | View shop details | Click any coffee shop marker |
+| Click map | Custom actions | Tap empty map area (optional handler) |
+
+```typescript src/components/leaflet-map-inner.tsx
+function ClickHandler({ onMapClick }: Pick<LeafletMapInnerProps, 'onMapClick'>) {
+  useMapEvents({
+    click: (event) => {
+      if (onMapClick) {
+        onMapClick(event.latlng.lat, event.latlng.lng)
+      }
+    },
+  })
+
+  return null
+}
+```
+
+## Pan to location
+
+Coffee Finder provides a `panToLocation` function to smoothly navigate to specific coordinates:
+
+```typescript src/components/google-map.tsx
+export function panToLocation(lat: number, lng: number, zoom?: number) {
+  if (!activeMap) {
+    return
+  }
+
+  const nextZoom = zoom ?? activeMap.getZoom()
+  activeMap.setView([lat, lng], nextZoom, { animate: true })
+}
+```
+
+This function is used when:
+- User clicks a coffee shop in the sidebar list
+- Selecting a "Most Popular" or "Trending Now" featured shop
+- Refreshing user location
+
+### Example usage
+
+```typescript src/app/page.tsx
+const handleShopSelect = (shop: CoffeeShop) => {
+  setSelectedShop(shop)
+  panToLocation(shop.location.lat, shop.location.lng, 17)
+}
+```
+
+<Tip>
+The zoom level 17 provides optimal detail for viewing individual coffee shops and surrounding streets.
+</Tip>
+
+## Dynamic marker generation
+
+Markers are dynamically created from coffee shop data:
+
+```typescript src/app/page.tsx
+const mapMarkers = visibleShops.map(shop => ({
+  id: shop.id,
+  position: shop.location,
+  title: shop.name,
+  address: shop.address,
+  rating: shop.rating,
+  totalRatings: shop.totalRatings,
+  isOpen: shop.isOpen,
+  distance: shop.distance,
+  phone: shop.phone,
+  website: shop.website,
+  onClick: () => handleShopSelect(shop)
+}))
+```
+
+The `visibleShops` array changes based on the selected discovery mode (All, Popular, Trending), automatically updating map markers.
+
+## OpenStreetMap tile layer
+
+Maps are rendered using free OpenStreetMap tiles:
+
+```tsx src/components/leaflet-map-inner.tsx
+<TileLayer
+  attribution='&copy; OpenStreetMap contributors'
+  url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+/>
+```
+
+<Note>
+OpenStreetMap tiles are free and community-maintained. The attribution is legally required and acknowledges the OpenStreetMap contributors.
+</Note>
+
+## Server-side rendering (SSR) handling
+
+Leaflet requires browser APIs and cannot render on the server. Coffee Finder uses Next.js dynamic imports:
+
+```typescript src/components/google-map.tsx
+const LeafletMapInner = dynamic<LeafletMapInnerProps>(
+  () => import('@/components/leaflet-map-inner').then((module) => module.LeafletMapInner),
+  {
+    ssr: false,
+  }
+)
+```
+
+The `ssr: false` option ensures Leaflet only loads in the browser, preventing server-side rendering errors.
+
+## Responsive sizing
+
+The map adapts to different screen sizes:
+
+```tsx src/app/page.tsx
+<GoogleMap
+  center={{ lat: location.lat, lng: location.lng }}
+  markers={mapMarkers}
+  zoom={15}
+  className="w-full h-[400px] md:h-[500px] lg:h-[600px]"
+/>
+```
+
+| Screen Size | Map Height |
+|-------------|------------|
+| Mobile (< 768px) | 400px |
+| Tablet (768px - 1024px) | 500px |
+| Desktop (> 1024px) | 600px |
+
+## Map state management
+
+The active map instance is stored in a module-level variable:
+
+```typescript src/components/google-map.tsx
+let activeMap: LeafletMap | null = null
+```
+
+This enables:
+- Programmatic map control (panning, zooming)
+- Accessing map state from outside React components
+- Cleanup when map is unmounted
+
+```typescript src/components/google-map.tsx
+onMapReady={(map) => {
+  activeMap = map
+}}
+onMapDispose={(map) => {
+  if (activeMap === map) {
+    activeMap = null
+  }
+})
+```
+
+<Warning>
+Only one map instance should be active at a time. The `onMapDispose` callback ensures proper cleanup when the component unmounts.
+</Warning>
+
+## Performance optimizations
+
+<Accordion title="Memoized center position">
+  ```typescript src/components/leaflet-map-inner.tsx
+  const centerPosition = useMemo<LatLngExpression>(
+    () => [center.lat, center.lng], 
+    [center.lat, center.lng]
+  )
+  ```
+  
+  Prevents unnecessary re-renders when center coordinates haven't changed.
+</Accordion>
+
+<Accordion title="Zoom control enabled">
+  ```tsx src/components/leaflet-map-inner.tsx
+  <MapContainer center={centerPosition} zoom={zoom} className={className} zoomControl={true}>
+  ```
+  
+  Uses native Leaflet zoom controls for better performance than custom implementations.
+</Accordion>
+
+<Accordion title="Conditional event handlers">
+  ```tsx src/components/leaflet-map-inner.tsx
+  eventHandlers={
+    marker.onClick
+      ? {
+          click: marker.onClick,
+        }
+      : undefined
+  }
+  ```
+  
+  Only attaches click handlers when needed, reducing event listener overhead.
+</Accordion>

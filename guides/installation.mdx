@@ -1,0 +1,298 @@
+---
+title: Installation
+description: Step-by-step guide to install and set up Coffee Finder on your local development environment
+---
+
+This guide walks you through installing Coffee Finder and getting it running on your local machine. Coffee Finder is built with Next.js 16, TypeScript, and uses Bun as the package manager.
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed on your system:
+
+<Steps>
+  <Step title="Install Bun">
+    Coffee Finder uses Bun as its package manager and runtime. Install Bun by running:
+
+    <CodeGroup>
+      ```bash macOS/Linux
+      curl -fsSL https://bun.sh/install | bash
+      ```
+
+      ```bash Windows (WSL)
+      curl -fsSL https://bun.sh/install | bash
+      ```
+
+      ```bash npm (alternative)
+      npm install -g bun
+      ```
+    </CodeGroup>
+
+    Verify the installation:
+
+    ```bash
+    bun --version
+    ```
+
+    <Note>
+      Bun is a fast all-in-one JavaScript runtime that serves as a drop-in replacement for Node.js. It includes a package manager, bundler, and test runner.
+    </Note>
+  </Step>
+
+  <Step title="Install Node.js (optional)">
+    While Bun is the primary runtime, some tools may require Node.js. Install Node.js 18+ if needed:
+
+    ```bash
+    # Using nvm (recommended)
+    nvm install 18
+    nvm use 18
+    ```
+
+    Visit [nodejs.org](https://nodejs.org) for other installation methods.
+  </Step>
+
+  <Step title="Verify Git installation">
+    Ensure Git is installed on your system:
+
+    ```bash
+    git --version
+    ```
+
+    If not installed, download it from [git-scm.com](https://git-scm.com).
+  </Step>
+</Steps>
+
+## Clone the repository
+
+Clone the Coffee Finder repository to your local machine:
+
+```bash
+git clone https://github.com/your-org/coffee-finder.git
+cd coffee-finder
+```
+
+<Tip>
+  If you're forking the project, replace the URL with your fork's URL.
+</Tip>
+
+## Install dependencies
+
+Install all required packages using Bun:
+
+```bash
+bun install
+```
+
+This command installs all dependencies defined in `package.json`, including:
+
+- **Next.js 16** - React framework with App Router
+- **TypeScript 5** - Type-safe JavaScript
+- **Tailwind CSS 4** - Utility-first CSS framework
+- **Prisma 6** - Database ORM
+- **shadcn/ui** - UI component library
+- **Leaflet** - Interactive map library
+- **React Query** - Data fetching and caching
+- **Zustand** - State management
+
+<Info>
+  The complete list of dependencies can be found in `/home/daytona/workspace/source/package.json`.
+</Info>
+
+## Database setup
+
+Coffee Finder uses SQLite with Prisma ORM for data persistence. The database stores user information and posts.
+
+<Steps>
+  <Step title="Configure database URL">
+    Create a `.env` file in the project root:
+
+    ```bash
+    touch .env
+    ```
+
+    Add the database connection string:
+
+    ```env .env
+    DATABASE_URL="file:./db/custom.db"
+    ```
+
+    <Note>
+      SQLite is used by default for simplicity. For production, consider PostgreSQL or MySQL.
+    </Note>
+  </Step>
+
+  <Step title="Review the Prisma schema">
+    The database schema is defined in `prisma/schema.prisma`:
+
+    ```prisma prisma/schema.prisma
+    datasource db {
+      provider = "sqlite"
+      url      = env("DATABASE_URL")
+    }
+
+    generator client {
+      provider = "prisma-client-js"
+    }
+
+    model User {
+      id        String   @id @default(cuid())
+      email     String   @unique
+      name      String?
+      createdAt DateTime @default(now())
+      updatedAt DateTime @updatedAt
+    }
+
+    model Post {
+      id        String   @id @default(cuid())
+      title     String
+      content   String?
+      published Boolean  @default(false)
+      authorId  String
+      createdAt DateTime @default(now())
+      updatedAt DateTime @updatedAt
+    }
+    ```
+  </Step>
+
+  <Step title="Generate Prisma client">
+    Generate the Prisma client based on your schema:
+
+    ```bash
+    bun run db:generate
+    ```
+
+    This command runs `prisma generate` and creates the TypeScript types for your database.
+  </Step>
+
+  <Step title="Push database schema">
+    Create the database and tables:
+
+    ```bash
+    bun run db:push
+    ```
+
+    This command runs `prisma db push` and synchronizes your schema with the database.
+
+    <Warning>
+      Use `db:push` for development. For production, use migrations with `bun run db:migrate`.
+    </Warning>
+  </Step>
+</Steps>
+
+## Environment variables
+
+Coffee Finder requires minimal environment configuration. Create a `.env` file with the following variables:
+
+```env .env
+# Database
+DATABASE_URL="file:./db/custom.db"
+
+# Application
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+NODE_ENV="development"
+
+# Optional: Overpass API (uses public endpoint by default)
+# OVERPASS_API_URL="https://overpass-api.de/api/interpreter"
+```
+
+<Accordion title="Environment variable reference">
+  | Variable | Required | Description | Default |
+  |----------|----------|-------------|----------|
+  | `DATABASE_URL` | Yes | Database connection string | `file:./db/custom.db` |
+  | `NEXT_PUBLIC_APP_URL` | No | Application base URL | `http://localhost:3000` |
+  | `NODE_ENV` | No | Environment mode | `development` |
+  | `OVERPASS_API_URL` | No | OpenStreetMap Overpass API endpoint | `https://overpass-api.de/api/interpreter` |
+</Accordion>
+
+## Verify installation
+
+Start the development server to verify everything is working:
+
+```bash
+bun run dev
+```
+
+You should see output similar to:
+
+```bash
+▲ Next.js 16.1.1
+- Local:        http://localhost:3000
+- Environments: .env
+
+✓ Ready in 2.1s
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser. You should see the Coffee Finder application with an interactive map.
+
+<Tip>
+  The application requests geolocation permission to show coffee shops near your location. Grant permission for full functionality.
+</Tip>
+
+## Available scripts
+
+The following scripts are available in `package.json`:
+
+| Script | Command | Description |
+|--------|---------|-------------|
+| `dev` | `bun run dev` | Start development server on port 3000 |
+| `build` | `bun run build` | Build for production with standalone output |
+| `start` | `bun run start` | Start production server |
+| `lint` | `bun run lint` | Run ESLint for code quality |
+| `db:push` | `bun run db:push` | Push schema changes to database |
+| `db:generate` | `bun run db:generate` | Generate Prisma client |
+| `db:migrate` | `bun run db:migrate` | Run database migrations |
+| `db:reset` | `bun run db:reset` | Reset database to initial state |
+
+## Troubleshooting
+
+<Accordion title="Bun installation fails">
+  If Bun installation fails, try:
+
+  1. Ensure you have curl installed: `curl --version`
+  2. Use npm as alternative: `npm install -g bun`
+  3. Check system requirements at [bun.sh](https://bun.sh)
+</Accordion>
+
+<Accordion title="Database connection errors">
+  If you encounter database errors:
+
+  1. Verify `.env` file exists with `DATABASE_URL`
+  2. Ensure `db` directory exists: `mkdir -p db`
+  3. Run `bun run db:push` to create the database
+  4. Check file permissions on the `db` directory
+</Accordion>
+
+<Accordion title="Port 3000 already in use">
+  If port 3000 is occupied:
+
+  ```bash
+  # Use a different port
+  bun run dev -- -p 3001
+  ```
+
+  Or kill the process using port 3000:
+
+  ```bash
+  # macOS/Linux
+  lsof -ti:3000 | xargs kill -9
+
+  # Windows
+  netstat -ano | findstr :3000
+  taskkill /PID <PID> /F
+  ```
+</Accordion>
+
+<Accordion title="TypeScript errors during development">
+  The project uses `ignoreBuildErrors: true` in `next.config.ts` for flexibility. To enable strict type checking:
+
+  1. Edit `next.config.ts`
+  2. Set `ignoreBuildErrors: false`
+  3. Run `bun run lint` to check for issues
+</Accordion>
+
+## Next steps
+
+Now that you have Coffee Finder installed:
+
+- [Configure the application](/guides/configuration) - Customize settings and behavior
+- [Deploy to production](/guides/deployment) - Learn deployment options
+- [Customize the theme](/guides/customization) - Modify colors and styling
