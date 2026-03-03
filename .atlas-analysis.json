@@ -1,0 +1,71 @@
+{
+  "projectType": "saas",
+  "projectName": "Coffee Finder",
+  "projectDescription": "A web application to discover nearby coffee shops using real-time geolocation and interactive maps",
+  "theme": "almond",
+  "primaryColor": "#d97706",
+  "lightColor": "#fef3c7",
+  "darkColor": "#92400e",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/geolocation",
+              "features/map-integration",
+              "features/search-discovery",
+              "features/coffee-shop-data"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/installation",
+              "guides/configuration",
+              "guides/deployment",
+              "guides/customization"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "API",
+            "pages": [
+              "api/overview",
+              "api/coffee-shops"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Real-time geolocation to find user's current position",
+    "Interactive map visualization with Leaflet",
+    "Coffee shop discovery via Overpass API",
+    "Search and filtering (All, Popular, Trending)",
+    "Distance calculation and sorting",
+    "Dark/light theme support",
+    "Responsive mobile-first design",
+    "Rich UI with shadcn/ui components"
+  ],
+  "publicApiSurface": [
+    "GET /api/coffee-shops - Fetch nearby coffee shops",
+    "GoogleMap component - Interactive map component",
+    "panToLocation() - Pan map to specific coordinates",
+    "useGoogleMaps() - Hook for map loading state"
+  ]
+}
